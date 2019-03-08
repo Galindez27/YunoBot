@@ -10,11 +10,13 @@
 | - | hello &lt;message> | Echos message | &#8734; |
 | search | rank &lt;names> | Searches for Summoners and retrieves their solo queue and flex queue ranks | 5 |
 | search | winrate &lt;names> | Returns the Win/Loss ratio for the last 20 Ranked games (solo or flex) of a player | 1 |
-| admin | list | List important people (defined as those with certain permissions) in a Dircord server | - |
+| admin | list | List important people (defined as those with certain permissions) in a Discord server | - |
 
 For example: <b>!search rank "Yandere Supreme"</b> results in my ranked information being returned. (Im hardstuck Gold IV mid pls help me)
 
 Some commands can have multiple parameters: <b>!search rank "Yandere Supreme" "TSM Bjergsen"</b>.
+
+Commands without a group can be invoked directly: <b> !hello</b>
 
 ### Config.json
 
