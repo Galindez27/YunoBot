@@ -45,8 +45,8 @@ Commands without a group can be invoked directly: <b> `hello</b>
 | Verbose | 4 |
 | Debug | 5 |
 
- Logging is done by anything below the log level set. For example, setting logging to 3 means warnings, errors, and
- critical failures will be output. It is not reccommended to set logging below Warning. Verbose exposes messages that
+ Logging is done by anything below the log level set. For example, setting logging to 3 means info, warnings, errors, and
+ critical failures will all be output. It is not reccommended to set logging below Warning. Verbose exposes messages that
  trigger a command and the information on the output of the command (NOT YET IMPLEMENTED), and Debug will expose the
  entire process behind building the output (NOT YET IMPLEMENTED).
 
