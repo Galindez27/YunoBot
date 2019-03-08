@@ -6,6 +6,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using Newtonsoft.Json;
+using MingweiSamuel.Camille;
+using YunoBot.Services;
+
 namespace YunoBot
 {
     class Program
@@ -13,8 +17,10 @@ namespace YunoBot
         private string CLIENT_ID;
         private string CLIENT_SECRET;
         private string BOT_TOKEN;
-        private char COMM_PREFIX;
-        private int COMM_PREF_POS = 0;
+        private string RKEY;
+        static private LogSeverity LogAt = LogSeverity.Info;
+        //private char COMM_PREFIX;
+        //private int COMM_PREF_POS = 0;
 
         static private DiscordSocketClient main_client;
         private readonly IServiceCollection map = new ServiceCollection();
@@ -25,10 +31,13 @@ namespace YunoBot
             => new Program().MainAsync().GetAwaiter().GetResult();
 
         private static Task Logger(LogMessage message){
+        if (message.Severity > LogAt) return Task.CompletedTask;
         var cc = Console.ForegroundColor;
         switch (message.Severity)
         {
             case LogSeverity.Critical:
+                Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                break;
             case LogSeverity.Error:
                 Console.ForegroundColor = ConsoleColor.Red;
                 break;
@@ -56,47 +65,41 @@ namespace YunoBot
     }
 
         public async Task MainAsync(){
-            using (StreamReader tfile = File.OpenText("tokenfile")){
-                while(!tfile.EndOfStream){
-                    string line = tfile.ReadLine();
-                    if(line == "botToken")
-                        BOT_TOKEN = tfile.ReadLine();
-                    else if (line == "clientSecret")
-                        CLIENT_SECRET = tfile.ReadLine();
-                    else if (line == "clientId")
-                        CLIENT_ID = tfile.ReadLine();
-                    else if (line == "prefix")
-                        COMM_PREFIX = tfile.ReadLine()[0];
-                }
+            using (StreamReader tfile = File.OpenText("config.json")){
+                dynamic config = JsonConvert.DeserializeObject(tfile.ReadToEnd());
+                CLIENT_ID = config.clientId ?? "NONE";
+                CLIENT_SECRET = config.clientSecret ?? "NONE";
+                RKEY = config.riotKey ?? throw (new ArgumentNullException("No Riot API Key (riotKey in config file) given!"));
+                BOT_TOKEN = config.botToken ?? throw (new ArgumentNullException("No Discord Bot token (botKey in config file) given!"));
+                
+                
             }
-            main_client = new DiscordSocketClient(new DiscordSocketConfig{LogLevel = LogSeverity.Info});
-            main_client.Log += Logger;
-            // main_client.MessageReceived += MessageRecieved;
-            await main_client.LoginAsync(TokenType.Bot, BOT_TOKEN);
-            await initCommands();
-            await main_client.StartAsync();
-            await Task.Delay(-1);
-        }
 
-        private async Task initCommands(){
-            //TODO: add dependencies like Camille and anything else that comes up
-            services = map.BuildServiceProvider();
-            await commands.AddModulesAsync(Assembly.GetEntryAssembly(), services);
-            main_client.MessageReceived += CommandHandler;
-        }
-
-        private async Task CommandHandler(SocketMessage message){
-            var param = message as SocketUserMessage;
-            if (param == null) return;
+            using (var services = ConfigServices()){
+                main_client = services.GetRequiredService<DiscordSocketClient>();
+                services.GetRequiredService<CommandService>().Log += Logger;
             
-            await Logger(new LogMessage(LogSeverity.Debug, $"Message from ({message.Author})", message.Content));
-
-            if (!(param.HasCharPrefix(COMM_PREFIX, ref COMM_PREF_POS))) return; //ignore any user message that doesnt have the command prefix or @Yuno_Bot
-
-            var context = new CommandContext(main_client, param);
-            var result = await commands.ExecuteAsync(context, COMM_PREF_POS, services); //Execute command
-            if (!result.IsSuccess)
-                await context.Channel.SendMessageAsync(result.ErrorReason);
+                main_client.Log += Logger;
+                await main_client.LoginAsync(TokenType.Bot, BOT_TOKEN);
+                await main_client.StartAsync();
+                await services.GetRequiredService<Services.CommandHandlingService>().InitializeAsync();
+                
+                await Task.Delay(-1);
+            }
         }
+
+
+        private ServiceProvider ConfigServices(){
+            
+
+            return new ServiceCollection()
+                .AddSingleton<DiscordSocketClient>()
+                .AddSingleton<RapiInfo>()
+                .AddSingleton<String>(RKEY)
+                .AddSingleton<CommandService>()
+                .AddSingleton<Services.CommandHandlingService>()
+                .BuildServiceProvider();
+        }
+
      }
 }

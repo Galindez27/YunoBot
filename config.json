@@ -1,0 +1,8 @@
+{
+    "riotKey": "yourKey",
+    "botToken": "yourToken",
+    "clientSecret": "yourSecret",
+    "clientId": -1,
+    "prefix": "*",
+    "logLevel": 3
+}
