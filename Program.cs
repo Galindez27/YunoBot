@@ -19,14 +19,14 @@ namespace YunoBot
         private string BOT_TOKEN;
         private string RKEY;
         static private LogSeverity LogAt = LogSeverity.Info;
-        //private char COMM_PREFIX;
-        //private int COMM_PREF_POS = 0;
 
+
+        //Services to maintain
         static private DiscordSocketClient main_client;
         private readonly IServiceCollection map = new ServiceCollection();
         private readonly CommandService commands = new CommandService();
-        private IServiceProvider services;
-
+        private RapiInfo rapi;
+        
         static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
 
@@ -78,6 +78,7 @@ namespace YunoBot
             using (var services = ConfigServices()){
                 main_client = services.GetRequiredService<DiscordSocketClient>();
                 services.GetRequiredService<CommandService>().Log += Logger;
+                rapi = services.GetRequiredService<RapiInfo>();
             
                 main_client.Log += Logger;
                 await main_client.LoginAsync(TokenType.Bot, BOT_TOKEN);
@@ -94,8 +95,8 @@ namespace YunoBot
 
             return new ServiceCollection()
                 .AddSingleton<DiscordSocketClient>()
-                .AddSingleton<RapiInfo>()
                 .AddSingleton<String>(RKEY)
+                .AddSingleton<RapiInfo>()
                 .AddSingleton<CommandService>()
                 .AddSingleton<Services.CommandHandlingService>()
                 .BuildServiceProvider();

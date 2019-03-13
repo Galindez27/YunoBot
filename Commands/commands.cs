@@ -17,6 +17,7 @@ using MingweiSamuel.Camille.MatchV4;
 using YunoBot.Services;
 
 namespace YunoBot.Commands{
+    [Summary("General Commands")]
     public class General : ModuleBase<SocketCommandContext>{
         [Command("hello"), Summary("Say hello. Simple Ping")]
         public async Task Say(params string[] remainder){
@@ -38,9 +39,11 @@ namespace YunoBot.Commands{
     [Group("search"), Summary("Search for information")]
     public class Search : ModuleBase<SocketCommandContext>{
 
-        public RapiInfo RapiInfoService {get; set;}
-        private int maxNamesSummoner = 5;
-        private int maxNamesWinrate = 1;
+        private RapiInfo RapiInfoService;
+
+        public Search(RapiInfo rpi){
+            RapiInfoService = rpi;
+        }
 
         public async Task<bool> isWin(long game, Summoner tocheck){
             Match match = await RapiInfoService.RAPI.MatchV4.GetMatchAsync(Region.NA, game);
@@ -63,8 +66,8 @@ namespace YunoBot.Commands{
 
         [Command("rank"), Summary("Search for summoner ranks by name")]
         public async Task byname(params string[] names){
-            if (names.Length > maxNamesSummoner){ 
-                await ReplyAsync($"Too many names! Max of {maxNamesSummoner}.");
+            if (names.Length > RapiInfoService.maxSearchRankedNames){ 
+                await ReplyAsync($"Too many names! Max of {RapiInfoService.maxSearchRankedNames}.");
                 return;
                 }
             await Context.Channel.TriggerTypingAsync();
@@ -102,7 +105,7 @@ namespace YunoBot.Commands{
             
             EmbedBuilder embeddedMessage = new EmbedBuilder();
             embeddedMessage.WithTitle("");
-            embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{RapiInfoService.PatchNum}/img/profileicon/{toprint[0].ProfileIconId}.png");
+            embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{RapiInfoService.patchNum}/img/profileicon/{toprint[0].ProfileIconId}.png");
             embeddedMessage.WithColor(0xff69b4);
             embeddedMessage.WithFields(fieldsX);
             await ReplyAsync("", embed:embeddedMessage.Build());
@@ -110,8 +113,8 @@ namespace YunoBot.Commands{
         
         [Command("winrate"), Summary("Get a last 20 Ranked games winrate for a player")]
         public async Task wr(params string[] names){
-            if(names.Length > maxNamesWinrate)
-                await Context.User.SendMessageAsync($"Too many names entered! Limit: {maxNamesWinrate}");
+            if(names.Length > RapiInfoService.maxSearchWinrateNames)
+                await Context.User.SendMessageAsync($"Too many names entered! Limit: {RapiInfoService.maxSearchWinrateNames}");
             else{
                 int[] qs = {420, 440};
                 double wins = 0, losses = 0;
@@ -140,7 +143,7 @@ namespace YunoBot.Commands{
                 content.Add(third);
 
                 EmbedBuilder embeddedMessage = new EmbedBuilder();
-                embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{RapiInfoService.PatchNum}/img/profileicon/{tofind.ProfileIconId}.png");
+                embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{RapiInfoService.patchNum}/img/profileicon/{tofind.ProfileIconId}.png");
                 embeddedMessage.WithColor(0xff69b4);
                 embeddedMessage.WithTitle("Last Twenty All Ranked Queues");
                 embeddedMessage.WithAuthor(tofind.Name);
@@ -152,7 +155,6 @@ namespace YunoBot.Commands{
             }
             
         }
-    
     }
 
     [Group("admin"), RequireUserPermission(GuildPermission.Administrator)]
@@ -198,5 +200,27 @@ namespace YunoBot.Commands{
     
     }
 
-    
+    [Group("Debug"), RequireOwner()]
+    public class DebugCommands : ModuleBase<SocketCommandContext>{
+        private List<Object> allServices;
+        public DebugCommands(RapiInfo rapi, CommandHandlingService handlerService){
+            allServices = new List<object>();
+            allServices.Add(rapi);
+            allServices.Add(handlerService);
+        }
+
+        [Command("Debug")]
+        public async Task basicDebug(){
+            string rep = "```";
+            foreach (var v in allServices){
+                rep += v.GetType() + "\n\t";
+                foreach (var prop in v.GetType().GetProperties()){
+                    rep += $"{prop.Name} : {prop.GetValue(v)}\n\t";
+                }
+                rep += "\n"; 
+            }
+            rep+= "```";
+            await ReplyAsync(rep);
+        }
+    }
 }

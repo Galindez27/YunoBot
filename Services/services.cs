@@ -25,13 +25,22 @@ namespace YunoBot.Services{
     
     public class RapiInfo{
         public RiotApi RAPI;
-        public string PatchNum = "00";
+        private string PatchNum = "00";
         
-        public RapiInfo(String key){
+
+        private int _MaxWinrateNames = 1;
+        private int _MaxRankedNames = 5;
+
+        public string patchNum {get { return PatchNum;}}
+        public int maxSearchRankedNames { get { return _MaxRankedNames;}}
+        public int maxSearchWinrateNames { get { return _MaxWinrateNames;}}
+        
+        public RapiInfo(String key, IServiceProvider services){
             RAPI = RiotApi.NewInstance(key);
             updateLeaguePatch().GetAwaiter().GetResult();
-            
         }
+
+        
 
         public async Task updateLeaguePatch(){
             WebRequest temp = WebRequest.Create("https://ddragon.leagueoflegends.com/api/versions.json");
@@ -50,6 +59,10 @@ namespace YunoBot.Services{
         private readonly CommandService _commands;
         private readonly DiscordSocketClient _discord;
         private readonly IServiceProvider _services;
+
+        public readonly int maxSearchRankedNames;
+        public readonly int maxSearchWinrateNames;
+
         private char prefix;
         private static LogSeverity LogAt = LogSeverity.Info;
 
