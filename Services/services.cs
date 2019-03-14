@@ -79,7 +79,7 @@ namespace YunoBot.Services{
             _discord.MessageReceived += MessageReceivedAsync;
         }
 
-        private static Task Logger(LogMessage message){
+        public static Task Logger(LogMessage message){
         if (message.Severity > LogAt) return Task.CompletedTask;
         var cc = Console.ForegroundColor;
         switch (message.Severity)

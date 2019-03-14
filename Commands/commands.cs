@@ -13,6 +13,7 @@ using MingweiSamuel.Camille.Enums;
 using MingweiSamuel.Camille.SummonerV4;
 using MingweiSamuel.Camille.LeagueV4;
 using MingweiSamuel.Camille.MatchV4;
+using MingweiSamuel.Camille.Util;
 
 using YunoBot.Services;
 
@@ -39,14 +40,14 @@ namespace YunoBot.Commands{
     [Group("search"), Summary("Search for information")]
     public class Search : ModuleBase<SocketCommandContext>{
 
-        private RapiInfo RapiInfoService;
+        private RapiInfo _rapi;
 
         public Search(RapiInfo rpi){
-            RapiInfoService = rpi;
+            _rapi = rpi;
         }
 
         public async Task<bool> isWin(long game, Summoner tocheck){
-            Match match = await RapiInfoService.RAPI.MatchV4.GetMatchAsync(Region.NA, game);
+            Match match = await _rapi.RAPI.MatchV4.GetMatchAsync(Region.NA, game);
             int playerId = -1;
             int playerTeam = -1;
             int playerTeamId = -1;
@@ -66,61 +67,60 @@ namespace YunoBot.Commands{
 
         [Command("rank"), Summary("Search for summoner ranks by name")]
         public async Task byname(params string[] names){
-            if (names.Length > RapiInfoService.maxSearchRankedNames){ 
-                await ReplyAsync($"Too many names! Max of {RapiInfoService.maxSearchRankedNames}.");
+            if (names.Length > _rapi.maxSearchRankedNames){ 
+                await ReplyAsync($"Too many names! Max of {_rapi.maxSearchRankedNames}.");
                 return;
                 }
             await Context.Channel.TriggerTypingAsync();
-            List<Summoner> toprint = new List<Summoner>();
-            List<EmbedFieldBuilder> fieldsX = new List<EmbedFieldBuilder>();
-            foreach (string n in names){
-                try{
-                    EmbedFieldBuilder field = new EmbedFieldBuilder();
-                    Summoner summ = await RapiInfoService.RAPI.SummonerV4.GetBySummonerNameAsync(Region.NA, n);
-                    LeaguePosition[] leagueInfo = await RapiInfoService.RAPI.LeagueV4.GetAllLeaguePositionsForSummonerAsync(Region.NA, summ.Id);
+            
+            List<Summoner> targets = new List<Summoner>();
+            List<EmbedFieldBuilder> fields = new List<EmbedFieldBuilder>();
+            foreach (string name in names){
+                EmbedFieldBuilder toAdd = new EmbedFieldBuilder();
+                toAdd.Name = name;
+                toAdd.Value = "```";
 
-                    toprint.Add(summ);
-                    field.WithName(summ.Name);
-                    string temp = "";
-                    foreach(var t in leagueInfo){
-                        if (t.Position != "NONE" && t.Position != "APEX"){
-                            temp += $"{(t.Position == "UTILITY" ? "Support" : (t.Position[0])+t.Position.Substring(1).ToLower())} - {t.Tier[0]+t.Tier.Substring(1).ToLower() , 7} {t.Rank}\n";
-                            //temp += $" WR: {(t.Wins / (t.Wins + t.Losses))*100}%\n";
-                        }
-                        else if (t.Position == "APEX"){
-                            temp += $"Solo Queue - {t.Tier[0]+t.Tier.Substring(1).ToLower()}\n";
-                        }
+                // Make sure the summoner name exists and has ranks before adding to fields
+                try {
+                    Summoner targSumm = await _rapi.RAPI.SummonerV4.GetBySummonerNameAsync(Region.NA, name);
+                    targets.Add(targSumm);
+                    LeaguePosition[] positions = await _rapi.RAPI.LeagueV4.GetAllLeaguePositionsForSummonerAsync(Region.NA, targSumm.Id);
+                    foreach (var pos in positions){
+                        string queue = pos.QueueType == "RANKED_FLEX_SR" ? "Flex:" : pos.QueueType == "RANKED_SOLO_5x5" ? "Solo/Duo:" : pos.QueueType == "RANKED_FLEX_TT" ? "Treeline:" : pos.QueueType + " ";
+                        double wr = (double)pos.Wins / (double)(pos.Wins + pos.Losses);
+                        string val = string.Format("{0, -9}{1, 13} {2, -3}|WR:{3, 4:P2}\n", queue, pos.Tier, pos.Rank, wr);
+                        toAdd.Value += val;
                     }
-                    field.WithValue(temp);
-                    fieldsX.Add(field);
                 }
-                catch(Exception ex){
-                    Console.WriteLine(ex.ToString());
-                    EmbedFieldBuilder field = new EmbedFieldBuilder();
-                    field.WithName(n);
-                    field.WithValue("Does not exist");
-                    fieldsX.Add(field);                
+                catch (RiotResponseException respError){
+                    if (respError.GetResponse().StatusCode == HttpStatusCode.NotFound){
+                        toAdd.Value = "Does not exist";
+                    }
                 }
+                toAdd.Value += "```";
+                fields.Add(toAdd);
             }
             
             EmbedBuilder embeddedMessage = new EmbedBuilder();
             embeddedMessage.WithTitle("");
-            embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{RapiInfoService.patchNum}/img/profileicon/{toprint[0].ProfileIconId}.png");
+            embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{targets[0].ProfileIconId}.png");
             embeddedMessage.WithColor(0xff69b4);
-            embeddedMessage.WithFields(fieldsX);
+            embeddedMessage.WithFields(fields);
+            embeddedMessage.WithCurrentTimestamp();
+            //embeddedMessage.WithFooter("As of");
             await ReplyAsync("", embed:embeddedMessage.Build());
         }
         
         [Command("winrate"), Summary("Get a last 20 Ranked games winrate for a player")]
         public async Task wr(params string[] names){
-            if(names.Length > RapiInfoService.maxSearchWinrateNames)
-                await Context.User.SendMessageAsync($"Too many names entered! Limit: {RapiInfoService.maxSearchWinrateNames}");
+            if(names.Length > _rapi.maxSearchWinrateNames)
+                await Context.User.SendMessageAsync($"Too many names entered! Limit: {_rapi.maxSearchWinrateNames}");
             else{
                 int[] qs = {420, 440};
                 double wins = 0, losses = 0;
                 await Context.Channel.TriggerTypingAsync();
-                Summoner tofind = await RapiInfoService.RAPI.SummonerV4.GetBySummonerNameAsync(Region.NA, names[0]);
-                Matchlist mlist = await RapiInfoService.RAPI.MatchV4.GetMatchlistAsync(Region.NA, tofind.AccountId, queue:qs, endIndex:20);
+                Summoner tofind = await _rapi.RAPI.SummonerV4.GetBySummonerNameAsync(Region.NA, names[0]);
+                Matchlist mlist = await _rapi.RAPI.MatchV4.GetMatchlistAsync(Region.NA, tofind.AccountId, queue:qs, endIndex:20);
                 foreach (MatchReference mref in mlist.Matches){
                     if (await isWin(mref.GameId, tofind)) { wins++ ;}
                     else { losses++; }
@@ -143,7 +143,7 @@ namespace YunoBot.Commands{
                 content.Add(third);
 
                 EmbedBuilder embeddedMessage = new EmbedBuilder();
-                embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{RapiInfoService.patchNum}/img/profileicon/{tofind.ProfileIconId}.png");
+                embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{tofind.ProfileIconId}.png");
                 embeddedMessage.WithColor(0xff69b4);
                 embeddedMessage.WithTitle("Last Twenty All Ranked Queues");
                 embeddedMessage.WithAuthor(tofind.Name);
