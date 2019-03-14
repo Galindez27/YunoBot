@@ -176,17 +176,18 @@ namespace YunoBot.Commands{
             List<EmbedFieldBuilder> fields = new List<EmbedFieldBuilder>();
             toEmbed.WithColor(0xff69b4);
             toEmbed.WithTitle(Context.Guild.Name + "\nImportant People");
+            toEmbed.ThumbnailUrl = Context.Guild.IconUrl;
             
             foreach (var user in Context.Guild.Users){
                 EmbedFieldBuilder field = new EmbedFieldBuilder();
                 bool isImportant = false;
-                field.Name = "<b>" + user.Username + "<\b>";
+                field.Name = user.Username;
                 field.Value = "```";
                 foreach (var role in user.Roles){
                     if (nImportant.Contains(role)){
                         isImportant = true;
                     }
-                    if (!role.IsEveryone) field.Value += role.Name + "; ";
+                    if (!role.IsEveryone) field.Value += role.Name + ", ";
                 }
                 field.Value += "```";
                 if (isImportant){
@@ -202,14 +203,22 @@ namespace YunoBot.Commands{
 
     [Group("Debug"), RequireOwner()]
     public class DebugCommands : ModuleBase<SocketCommandContext>{
-        private List<Object> allServices;
+        private Dictionary<string, Object> allServices;
         public DebugCommands(RapiInfo rapi, CommandHandlingService handlerService){
-            allServices = new List<object>();
-            allServices.Add(rapi);
-            allServices.Add(handlerService);
+            allServices = new Dictionary<string, object>();
+            allServices.Add("rapi", rapi);
+            allServices.Add("commandHandler", handlerService);
         }
 
-        [Command("Debug")]
+        [Command("updateLeague")]
+        public async Task upLeague(){
+            RapiInfo rapi = allServices["rapi"] as RapiInfo;
+            await Context.Channel.SendMessageAsync($"Current patch: {rapi.patchNum}");
+            await rapi.updateLeaguePatch();
+            await ReplyAsync($"New patch: {rapi.patchNum}");
+        }
+
+        [Command("allServices")]
         public async Task basicDebug(){
             string rep = "```";
             foreach (var v in allServices){
