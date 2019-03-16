@@ -65,7 +65,9 @@ namespace YunoBot.Services{
         public readonly int maxSearchRankedNames;
         public readonly int maxSearchWinrateNames;
 
-        private char prefix;
+        private static char prefix;
+        public static char Prefix {get { return prefix;}}
+
         private static LogSeverity LogAt = LogSeverity.Info;
 
         public CommandHandlingService(IServiceProvider services)
@@ -77,6 +79,10 @@ namespace YunoBot.Services{
             _commands.Log += Logger;
             _commands.CommandExecuted += CommandExecutedAsync;
             _discord.MessageReceived += MessageReceivedAsync;
+        }
+
+        public static void setLog(int newLevel){
+            LogAt = (LogSeverity)newLevel;
         }
 
         public static Task Logger(LogMessage message){
@@ -113,6 +119,9 @@ namespace YunoBot.Services{
         return Task.CompletedTask;
     }
 
+        public static void setPrefix(char newPrefix){
+            prefix = newPrefix;
+        }
         public async Task CommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)
         { //pulled from example code
             // command is unspecified when there was a search failure (command not found); we don't care about these errors
@@ -129,22 +138,13 @@ namespace YunoBot.Services{
             }
 
             // the command failed, let's notify the user that something happened.
-            await Logger(new LogMessage(LogSeverity.Debug, "Command Execution", $"Failure. Result: {result.ToString()}"));
+            await Logger(new LogMessage(LogSeverity.Error, "Command Execution", $"Failure. Result: {result.ToString()}"));
             await context.Channel.SendMessageAsync($"error: {result.ToString()}");
         }
 
         public async Task InitializeAsync()
         { //pulled from example code
             await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
-
-            using (StreamReader tfile = File.OpenText("config.json")){
-                dynamic config = JsonConvert.DeserializeObject(await tfile.ReadToEndAsync());
-                prefix = config.prefix ?? (char)8;
-            }
-            if (prefix == (char)8){
-                await Logger(new LogMessage(LogSeverity.Warning, "Configuraton", "No prefix found in config.json! Default is '`'"));
-                prefix = '`';
-            }
         }
 
         public async Task MessageReceivedAsync(SocketMessage rawMessage)

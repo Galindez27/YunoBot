@@ -67,14 +67,17 @@ namespace YunoBot
         public async Task MainAsync(){
             using (StreamReader tfile = File.OpenText("config.json")){
                 dynamic config = JsonConvert.DeserializeObject(tfile.ReadToEnd());
+                char tempPrefix = config.prefix ?? '`';
+                int tempLevel = config.logLevel ?? 3;
+
                 CLIENT_ID = config.clientId ?? "NONE";
                 CLIENT_SECRET = config.clientSecret ?? "NONE";
                 RKEY = config.riotKey ?? throw (new ArgumentNullException("No Riot API Key (riotKey in config file) given!"));
                 BOT_TOKEN = config.botToken ?? throw (new ArgumentNullException("No Discord Bot token (botKey in config file) given!"));
-                
-                
+                CommandHandlingService.setLog(tempLevel);
+                CommandHandlingService.setPrefix(tempPrefix);
             }
-
+            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Info, "Config", $"Prefix set to:'{CommandHandlingService.Prefix}'"));
             using (var services = ConfigServices()){
                 main_client = services.GetRequiredService<DiscordSocketClient>();
                 services.GetRequiredService<CommandService>().Log += Logger;

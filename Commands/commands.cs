@@ -15,21 +15,17 @@ using MingweiSamuel.Camille.LeagueV4;
 using MingweiSamuel.Camille.MatchV4;
 using MingweiSamuel.Camille.Util;
 
-using YunoBot.Services;
+using YunoBot.Services; 
 
 namespace YunoBot.Commands{
     [Summary("General Commands")]
     public class General : ModuleBase<SocketCommandContext>{
-        [Command("hello"), Summary("Say hello. Simple Ping")]
-        public async Task Say(params string[] remainder){
-            string tobuild = "";
-            foreach (string g in remainder){
-                tobuild += g + " ";
-            }
-            await ReplyAsync($"Hello! {Context.User.Username} said: {tobuild}");
+        [Command("hello"), Summary("Say hello. Simple Ping"), Priority(1)]
+        public async Task Say([Remainder()]string remainder ){
+            await ReplyAsync($"Hello! {Context.User.Username} said: {remainder}");
         }
 
-        [Command("hello"), Summary("Say hello2")]
+        [Command("hello"), Summary("Say hello2"), Priority(0)]
         public async Task Say(){
             await ReplyAsync("Hello!");
         }
@@ -46,7 +42,8 @@ namespace YunoBot.Commands{
             _rapi = rpi;
         }
 
-        public async Task<bool> isWin(long game, Summoner tocheck){
+        private async Task<bool> isWin(long game, Summoner tocheck){
+            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "isWin Check", $"GameID:{game}, PlayerACC:{tocheck.AccountId}, Name:{tocheck.Name}"));
             Match match = await _rapi.RAPI.MatchV4.GetMatchAsync(Region.NA, game);
             int playerId = -1;
             int playerTeam = -1;
@@ -62,9 +59,10 @@ namespace YunoBot.Commands{
             if (match.Teams[playerTeam].TeamId != playerTeamId){
                 throw new IndexOutOfRangeException($"TeamId found:{playerTeamId}, Team index made:{playerTeam}, TeamId in index reached:{match.Teams[playerTeam].TeamId}");
             }
+            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "isWinCheck", $"{match.Teams[playerTeam].Win == "Win"}"));
             return match.Teams[playerTeam].Win == "Win";
         }
-
+        
         [Command("rank"), Summary("Search for summoner ranks by name")]
         public async Task byname(params string[] names){
             if (names.Length > _rapi.maxSearchRankedNames){ 
@@ -78,7 +76,7 @@ namespace YunoBot.Commands{
             foreach (string name in names){
                 EmbedFieldBuilder toAdd = new EmbedFieldBuilder();
                 toAdd.Name = name;
-                toAdd.Value = "```";
+                toAdd.Value = " ";
 
                 // Make sure the summoner name exists and has ranks before adding to fields
                 try {
@@ -86,9 +84,8 @@ namespace YunoBot.Commands{
                     targets.Add(targSumm);
                     LeaguePosition[] positions = await _rapi.RAPI.LeagueV4.GetAllLeaguePositionsForSummonerAsync(Region.NA, targSumm.Id);
                     foreach (var pos in positions){
-                        string queue = pos.QueueType == "RANKED_FLEX_SR" ? "Flex:" : pos.QueueType == "RANKED_SOLO_5x5" ? "Solo/Duo:" : pos.QueueType == "RANKED_FLEX_TT" ? "Treeline:" : pos.QueueType + " ";
-                        double wr = (double)pos.Wins / (double)(pos.Wins + pos.Losses);
-                        string val = string.Format("{0, -9}{1, 13} {2, -3}|WR:{3, 4:P2}\n", queue, pos.Tier, pos.Rank, wr);
+                        string queue = pos.QueueType == "RANKED_FLEX_SR" ? "Flex" : pos.QueueType == "RANKED_SOLO_5x5" ? "Solo/Duo" : pos.QueueType == "RANKED_FLEX_TT" ? "3v3" : pos.QueueType;
+                        string val = string.Format("{0}: {1} {2}\n", queue, (pos.Tier[0] + pos.Tier.Substring(1).ToLower()), pos.Rank);
                         toAdd.Value += val;
                     }
                 }
@@ -97,13 +94,16 @@ namespace YunoBot.Commands{
                         toAdd.Value = "Does not exist";
                     }
                 }
-                toAdd.Value += "```";
                 fields.Add(toAdd);
             }
             
+            int ProfileIconId;
+            try {ProfileIconId = targets[0].ProfileIconId;}
+            catch (NullReferenceException){ProfileIconId = 501;}
+
             EmbedBuilder embeddedMessage = new EmbedBuilder();
             embeddedMessage.WithTitle("");
-            embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{targets[0].ProfileIconId}.png");
+            embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{ProfileIconId}.png");
             embeddedMessage.WithColor(0xff69b4);
             embeddedMessage.WithFields(fields);
             embeddedMessage.WithCurrentTimestamp();
@@ -125,7 +125,7 @@ namespace YunoBot.Commands{
                     if (await isWin(mref.GameId, tofind)) { wins++ ;}
                     else { losses++; }
                 }
-
+                
                 double wr  = wins / (wins + losses);
                 List<EmbedFieldBuilder> content = new List<EmbedFieldBuilder>();
                 EmbedFieldBuilder first = new EmbedFieldBuilder();
