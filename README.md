@@ -74,4 +74,7 @@ Commands without a group can be invoked directly: <b> `hello</b>
  most of the finer deatails of asynchronous programming, it was quite hard to wrap my brain around the exact nature of
  async. Once I straightened out how exactly async can be used to execute many tasks in parralel, it became quite clear
  that the benefits are enormous for a web based application such as this, allowing computing to be done while waiting on
- information to be recieved and parsed from a remote service. 
+ information to be recieved and parsed from a remote service.
+
+### contact
+ galindez@bu.edu

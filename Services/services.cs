@@ -62,11 +62,20 @@ namespace YunoBot.Services{
         private readonly DiscordSocketClient _discord;
         private readonly IServiceProvider _services;
 
+        private List<ModuleInfo> _loadedModules;
+        public List<ModuleInfo> LoadedModule {get {return _loadedModules;}}
+
         public readonly int maxSearchRankedNames;
         public readonly int maxSearchWinrateNames;
 
+        
+        public readonly string HelpMessage;
+
         private static char prefix;
         public static char Prefix {get { return prefix;}}
+        
+        private static EmbedBuilder _groupHelpMessage;
+        public static EmbedBuilder GroupHelpMessage {get { return _groupHelpMessage;}}
 
         private static LogSeverity LogAt = LogSeverity.Info;
 
@@ -79,6 +88,7 @@ namespace YunoBot.Services{
             _commands.Log += Logger;
             _commands.CommandExecuted += CommandExecutedAsync;
             _discord.MessageReceived += MessageReceivedAsync;
+
         }
 
         public static void setLog(int newLevel){
@@ -107,7 +117,7 @@ namespace YunoBot.Services{
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 break;
         }
-        Console.WriteLine($"{DateTime.Now,-19} [{message.Severity,-8}] {message.Source}: {message.Message}");
+        Console.WriteLine($"{DateTime.Now,-19} [{message.Severity,-8}] {message.Source, -15}| {message.Message}");
         Console.ForegroundColor = cc;
         
         // If you get an error saying 'CompletedTask' doesn't exist,
@@ -126,31 +136,61 @@ namespace YunoBot.Services{
         { //pulled from example code
             // command is unspecified when there was a search failure (command not found); we don't care about these errors
             if (!command.IsSpecified){
-                await Logger(new LogMessage(LogSeverity.Debug, "Command Execution", $"Command not found"));
+                await Logger(new LogMessage(LogSeverity.Verbose, "Comm Execution", $"Command not found"));
+                await context.User.SendMessageAsync("Command not found :thinking:");
                 return;
             }
 
-            await Logger(new LogMessage(LogSeverity.Debug, "Command Execution", $"Command executed: {command.Value.Name}"));
+            await Logger(new LogMessage(LogSeverity.Verbose, "Comm Execution", $"Command executed: {command.Value.Name}"));
             // the command was succesful, we don't care about this result, unless we want to log that a command succeeded.
             if (result.IsSuccess){
-                await Logger(new LogMessage(LogSeverity.Debug, "Command Execution", "Successful"));
+                await Logger(new LogMessage(LogSeverity.Debug, "Comm Execution", "Successful"));
                 return;
             }
 
             // the command failed, let's notify the user that something happened.
-            await Logger(new LogMessage(LogSeverity.Error, "Command Execution", $"Failure. Result: {result.ToString()}"));
-            await context.Channel.SendMessageAsync($"error: {result.ToString()}");
+            await Logger(new LogMessage(LogSeverity.Error, "Comm Execution", $"Failure. Result: {result.ToString()}"));
+
+            await context.Channel.SendMessageAsync($"error: {result.ToString()}, {result.Error}");
         }
 
         public async Task InitializeAsync()
         { //pulled from example code
-            await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
+            _loadedModules = new List<ModuleInfo>(await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services));
+            EmbedBuilder toEmbed = new EmbedBuilder();
+            List<EmbedFieldBuilder> embedFields = new List<EmbedFieldBuilder>();
+
+            foreach (ModuleInfo modInfo in _loadedModules){
+                EmbedFieldBuilder field = new EmbedFieldBuilder();
+                field.IsInline = true;
+                await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "Help Command", $"Module Read:{modInfo.Name}"));
+                field.Name = ":black_small_square:" + modInfo.Name;
+                string v = $"**Summary**:\n{modInfo.Summary}\n\n**Aliases**:\n";
+                foreach (string alias in modInfo.Aliases){
+                    v += $"'{alias}' ";
+                }
+                v += "\n\n**Commands**\n";
+                foreach (CommandInfo comm in modInfo.Commands){
+                    v += $"{comm.Name} ";
+                }
+                field.Value = v + "";
+                embedFields.Add(field); 
+            }
+            
+
+            toEmbed.WithColor(0xff69b4);
+            toEmbed.WithCurrentTimestamp();
+            toEmbed.WithTitle("GitHub");
+            toEmbed.WithUrl("https://github.com/Galindez27/YunoBot");
+            toEmbed.WithFields(embedFields);
+            _groupHelpMessage = toEmbed;
         }
 
         public async Task MessageReceivedAsync(SocketMessage rawMessage)
         {//modified from example code
             var argPos = 0;
-            await Logger(new LogMessage(LogSeverity.Debug, "Message Recieved", rawMessage.ToString()));
+            await Logger(new LogMessage(LogSeverity.Verbose, "MessageRecieved", $"{rawMessage.Channel}, Author:{rawMessage.Author}"));
+            if (!rawMessage.Author.IsBot) {await Logger(new LogMessage(LogSeverity.Verbose, "MessageRecieved", rawMessage.ToString()));}
             // Ignore system messages, or messages from other bots
             if (!(rawMessage is SocketUserMessage message)) return;
             if (message.Source != MessageSource.User) return;

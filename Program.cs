@@ -30,7 +30,7 @@ namespace YunoBot
         static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
 
-        private static Task Logger(LogMessage message){
+        public static Task Logger(LogMessage message){
         if (message.Severity > LogAt) return Task.CompletedTask;
         var cc = Console.ForegroundColor;
         switch (message.Severity)
@@ -52,7 +52,7 @@ namespace YunoBot
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 break;
         }
-        Console.WriteLine($"{DateTime.Now,-19} [{message.Severity,-8}] {message.Source}: {message.Message}");
+        Console.WriteLine($"{DateTime.Now,-19} [{message.Severity,-8}] {message.Source, -15}| {message.Message}");
         Console.ForegroundColor = cc;
         
         // If you get an error saying 'CompletedTask' doesn't exist,

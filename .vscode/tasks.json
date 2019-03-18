@@ -9,7 +9,11 @@
                 "build",
                 "${workspaceFolder}/YunoBot.csproj"
             ],
-            "problemMatcher": "$msCompile"
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }
