@@ -62,22 +62,22 @@ namespace YunoBot.Services{
         private readonly DiscordSocketClient _discord;
         private readonly IServiceProvider _services;
 
-        private List<ModuleInfo> _loadedModules;
-        public List<ModuleInfo> LoadedModule {get {return _loadedModules;}}
+        public DiscordSocketClient discordClient {get {return _discord;}}
 
         public readonly int maxSearchRankedNames;
         public readonly int maxSearchWinrateNames;
-
-        
         public readonly string HelpMessage;
 
-        private static char prefix;
-        public static char Prefix {get { return prefix;}}
-        
-        private static EmbedBuilder _groupHelpMessage;
-        public static EmbedBuilder GroupHelpMessage {get { return _groupHelpMessage;}}
-
         private static LogSeverity LogAt = LogSeverity.Info;
+        private static char prefix;
+        private static Embed _groupHelpMessage;
+        private static Dictionary<string, Embed> _helpMessages;
+        private static List<ModuleInfo> _loadedModules;
+
+        public static List<ModuleInfo> LoadedModule {get {return _loadedModules;}}
+        public static char Prefix {get { return prefix;}}
+        public static Embed GroupHelpMessage {get { return _groupHelpMessage;}}
+
 
         public CommandHandlingService(IServiceProvider services)
         {
@@ -88,11 +88,116 @@ namespace YunoBot.Services{
             _commands.Log += Logger;
             _commands.CommandExecuted += CommandExecutedAsync;
             _discord.MessageReceived += MessageReceivedAsync;
-
         }
-
+        
         public static void setLog(int newLevel){
             LogAt = (LogSeverity)newLevel;
+        }
+        public bool getHelp(string groupName, out Embed helpEmbed){
+            // Returns true if there is a help embed by the specified name, else false.
+            return _helpMessages.TryGetValue(groupName, out helpEmbed);
+        }
+        public void generateHelp(){
+            // Generate Help Messages for Modules and Commands
+            Logger(new LogMessage(LogSeverity.Verbose, "Help Command", "Generating Help Embeds"));
+            EmbedAuthorBuilder me = new EmbedAuthorBuilder();
+            while (_discord.CurrentUser == null){}
+            me.WithIconUrl(_discord.CurrentUser.GetAvatarUrl());
+            me.Name = _discord.CurrentUser.Username;
+            
+            EmbedBuilder mainHelpMessage = new EmbedBuilder();
+            List<EmbedFieldBuilder> mainHelpEmbedFields = new List<EmbedFieldBuilder>();
+            Dictionary<string, Embed> groupHelpMessages = new Dictionary<string, Embed>();
+
+            foreach (ModuleInfo modInfo in _loadedModules){
+                CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "Help Command", $"Module Read:{modInfo.Name}"));
+
+                EmbedFieldBuilder mainGroupField = new EmbedFieldBuilder();
+                EmbedBuilder soloGroupHelp = new EmbedBuilder();
+                List<EmbedFieldBuilder> soloGroupCommands = new List<EmbedFieldBuilder>();
+                string embedFieldForm = "**Summary**\n{0}\n\n**Aliases**\n{1}\n\n**{2}**\n{3}";
+                string summ = "";
+                string ali = "";
+                string flex = "";
+                string flexv = "";
+
+                mainGroupField.IsInline = true;
+                mainGroupField.Name = ":small_red_triangle:" + modInfo.Name;
+                soloGroupHelp.Title = modInfo.Name;
+
+                string[] summSplit = modInfo.Summary.Split(' ');
+
+                
+                int lineLen = 0;
+                foreach (string word in summSplit){ // Wrap text to 31 characters
+                    if (lineLen + word.Length > 31){
+                        lineLen = 0;
+                        summ += '\n';
+                    }
+                    summ += word + ' ';
+                    lineLen += word.Length + 1;
+                }
+
+                if (modInfo.Aliases.Count == 0) { ali += "None";}
+                else {
+                    foreach (string alias in modInfo.Aliases){
+                        ali += alias + " ";
+                    }
+                }
+
+                flex = "Commands";
+                foreach (CommandInfo comm in modInfo.Commands){
+                    string soloSumm = "None";
+                    string soloAli = "None";
+                    string soloFlex = "Arguments";
+                    string soloFlexV = comm.Remarks;
+
+                    flexv += $"{comm.Name} ";
+                    EmbedFieldBuilder commandField = new EmbedFieldBuilder();
+                    commandField.Name = comm.Name;
+                    commandField.IsInline = true;
+
+                    int linelen = 0;
+                    if (comm.Summary != null){
+                        soloSumm = "";
+                        foreach (string word in comm.Summary.Split(' ')){ // Wrap text to 31 characters
+                            if (linelen + word.Length > 31){
+                                soloSumm += '\n';
+                            }
+                            soloSumm += word;
+                        }
+                    }
+                    if (comm.Aliases.Count != 0) {
+                        soloAli = "";
+                        foreach (string alias in comm.Aliases){
+                            soloAli += alias + " ";
+                        }
+                    }
+
+                    commandField.Value = string.Format(embedFieldForm, soloSumm, soloAli, soloFlex, soloFlexV);
+                    soloGroupCommands.Add(commandField);
+                }
+                soloGroupHelp.WithFields(soloGroupCommands);
+                soloGroupHelp.WithColor(0xff69b4);
+                soloGroupHelp.WithCurrentTimestamp();
+                soloGroupHelp.WithFooter(new EmbedFooterBuilder().WithText("Live since: "));
+                soloGroupHelp.WithAuthor(me);
+                groupHelpMessages.Add(soloGroupHelp.Title, soloGroupHelp.Build());
+
+                mainGroupField.Value = string.Format(embedFieldForm, summ, ali, flex, flexv);
+                mainHelpEmbedFields.Add(mainGroupField);
+            }
+            
+
+            mainHelpMessage.WithColor(0xff69b4);
+            mainHelpMessage.WithCurrentTimestamp();
+            mainHelpMessage.WithTitle("GitHub");
+            mainHelpMessage.WithUrl("https://github.com/Galindez27/YunoBot");
+            mainHelpMessage.WithFields(mainHelpEmbedFields);
+            mainHelpMessage.WithFooter(new EmbedFooterBuilder().WithText("Live since: "));
+            mainHelpMessage.WithAuthor(me);
+            _groupHelpMessage = mainHelpMessage.Build();
+            _helpMessages = groupHelpMessages;
         }
 
         public static Task Logger(LogMessage message){
@@ -137,7 +242,7 @@ namespace YunoBot.Services{
             // command is unspecified when there was a search failure (command not found); we don't care about these errors
             if (!command.IsSpecified){
                 await Logger(new LogMessage(LogSeverity.Verbose, "Comm Execution", $"Command not found"));
-                await context.User.SendMessageAsync("Command not found :thinking:");
+                await context.User.SendMessageAsync($":confounded: Command not found!");
                 return;
             }
 
@@ -149,41 +254,14 @@ namespace YunoBot.Services{
             }
 
             // the command failed, let's notify the user that something happened.
-            await Logger(new LogMessage(LogSeverity.Error, "Comm Execution", $"Failure. Result: {result.ToString()}"));
-
-            await context.Channel.SendMessageAsync($"error: {result.ToString()}, {result.Error}");
+            await Logger(new LogMessage(LogSeverity.Error, "Comm Execution", $"Failure. Result: {result}"));
+            await context.User.SendMessageAsync($"Something went wrong!\nReason:{result.ErrorReason}");
         }
 
         public async Task InitializeAsync()
         { //pulled from example code
             _loadedModules = new List<ModuleInfo>(await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services));
-            EmbedBuilder toEmbed = new EmbedBuilder();
-            List<EmbedFieldBuilder> embedFields = new List<EmbedFieldBuilder>();
-
-            foreach (ModuleInfo modInfo in _loadedModules){
-                EmbedFieldBuilder field = new EmbedFieldBuilder();
-                field.IsInline = true;
-                await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "Help Command", $"Module Read:{modInfo.Name}"));
-                field.Name = ":black_small_square:" + modInfo.Name;
-                string v = $"**Summary**:\n{modInfo.Summary}\n\n**Aliases**:\n";
-                foreach (string alias in modInfo.Aliases){
-                    v += $"'{alias}' ";
-                }
-                v += "\n\n**Commands**\n";
-                foreach (CommandInfo comm in modInfo.Commands){
-                    v += $"{comm.Name} ";
-                }
-                field.Value = v + "";
-                embedFields.Add(field); 
-            }
-            
-
-            toEmbed.WithColor(0xff69b4);
-            toEmbed.WithCurrentTimestamp();
-            toEmbed.WithTitle("GitHub");
-            toEmbed.WithUrl("https://github.com/Galindez27/YunoBot");
-            toEmbed.WithFields(embedFields);
-            _groupHelpMessage = toEmbed;
+            generateHelp();
         }
 
         public async Task MessageReceivedAsync(SocketMessage rawMessage)

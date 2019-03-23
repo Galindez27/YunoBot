@@ -15,18 +15,21 @@ using MingweiSamuel.Camille.SummonerV4;
 using MingweiSamuel.Camille.LeagueV4;
 using MingweiSamuel.Camille.MatchV4;
 using MingweiSamuel.Camille.Util;
+using MingweiSamuel.Camille.SpectatorV4;
 
 using YunoBot.Services; 
 
 namespace YunoBot.Commands{
-    [Summary("General Commands\nThese commands do not\nrequire the <group> argument."), Name("General Commands.")]
+    [Name("General Commands.")]
+    [Summary("These commands do not require the <group> argument.")]
     public class General : ModuleBase<SocketCommandContext>{
         private string[] uwus = {"𝓤𝔀𝓤", "ÚwÚ", "(。U ω U。)", "(⁄˘⁄ ⁄ ω⁄ ⁄ ˘⁄)♡", "end my suffering", "✧･ﾟ: *✧･ﾟ♡*(ᵘʷᵘ)*♡･ﾟ✧*:･ﾟ✧", "𝒪𝓌𝒪", "(⁄ʘ⁄ ⁄ ω⁄ ⁄ ʘ⁄)♡"};
         private CommandHandlingService _handler;
+        RapiInfo _rapi;
 
-
-        public General(CommandHandlingService handlingService){
+        public General(CommandHandlingService handlingService, RapiInfo rapi){
             _handler = handlingService;
+            _rapi = rapi;
         }
 
         [Command("hello"), Summary("Say hello. Simple Ping"), Priority(1)]
@@ -34,21 +37,18 @@ namespace YunoBot.Commands{
             await ReplyAsync($"Hello! {Context.User.Username} said: {remainder}");
         }
 
-        [Command("hello"), Summary("Say hello2"), Priority(0)]
+        [Command("hello"), Summary("Say hello."), Priority(0)]
         public async Task Say(){
             await ReplyAsync("Hello!");
         }
 
         [Command("help"), Alias("h", "?", "pls", "wtf", "halp"), Summary("Reply with some helpful info!")]
         public async Task yunoHelp(){
-            EmbedAuthorBuilder me = new EmbedAuthorBuilder();
-            me.WithIconUrl(Context.Client.CurrentUser.GetAvatarUrl());
-            me.Name = Context.Client.CurrentUser.Username;
-
-            EmbedBuilder toEmbed = CommandHandlingService.GroupHelpMessage;
-            toEmbed.WithAuthor(me);
-            await ReplyAsync($"Listed below with :black_small_square: are groups. You will also find a small summary of each group, aliases to quickly call them, and commands you can activate.\n\nTo interact with me, you type \n*\\{CommandHandlingService.Prefix}<group> <command> <arguments.>*\n\n For Example, you can type: *\\{CommandHandlingService.Prefix}search rank \"Yandere Supreme\"* to lookup my creator's league rank!\n\nIf you cannot see the list below, note that this bot requires the embed permission to function properly!", embed:toEmbed.Build());
+            Embed toEmbed = CommandHandlingService.GroupHelpMessage;
+            await Context.User.SendMessageAsync($"Listed below with :small_red_triangle: are groups. You will also find a small summary of each group, aliases to quickly call them, and commands you can activate.\n\nTo interact with me, you type \n*\\{CommandHandlingService.Prefix}<group> <command> <arguments.>*\n\n For Example, you can type: *\\{CommandHandlingService.Prefix}search rank \"imaqtpie\"* to lookup the best AD in NA!\n\nIf you cannot see the list below, note that this bot requires the embed permission to function properly!", embed:toEmbed);
         }
+
+        
     
         [Command("uwu"), Summary("*uwu*")]
         public async Task degenerecy(){
@@ -57,7 +57,8 @@ namespace YunoBot.Commands{
         }
     }
 
-    [Group("search"), Summary("Search for LoL related information."), Alias("s"), Name("Search Commands")]
+    [Group("search"), Alias("s"), Name("Search Commands")]
+    [Summary("Search for LoL related information.")]
     public class Search : ModuleBase<SocketCommandContext>{
 
         private RapiInfo _rapi;
@@ -87,6 +88,52 @@ namespace YunoBot.Commands{
             return match.Teams[playerTeam].Win == "Win";
         }
         
+        [Command("ingame"), Summary("Find the ranks for all other players in the specified player's currently active game")]
+        public async Task ingame(string target){
+            await Context.Channel.TriggerTypingAsync();
+            Summoner targetSumm = null;
+            CurrentGameInfo runningGame = null;
+            try {
+                targetSumm = await _rapi.RAPI.SummonerV4.GetBySummonerNameAsync(Region.NA, target) ?? throw new InvalidDataException();
+                runningGame = await _rapi.RAPI.SpectatorV4.GetCurrentGameInfoBySummonerAsync(Region.NA, targetSumm.Id) ?? throw new InvalidOperationException();
+            }
+            catch (InvalidDataException){
+                await ReplyAsync($"{target} not found!");
+                return;
+            }
+            catch (InvalidOperationException){
+                await ReplyAsync($"{target} not currently in a game!");
+                return;
+            }
+
+            List<EmbedFieldBuilder> fields =  new List<EmbedFieldBuilder>();
+            
+            for (int i = 0; i < runningGame.Participants.Length; i++) {
+
+                EmbedFieldBuilder field = new EmbedFieldBuilder();
+                field.IsInline = true;
+                field.Name = $"{(runningGame.Participants[i].TeamId == 100 ? ":small_red_triangle:" : ":small_blue_diamond:")}{((Champion)runningGame.Participants[i].ChampionId).Name()}";
+                field.Value = $"{runningGame.Participants[i].SummonerName}\n";
+                LeaguePosition[] positions = await _rapi.RAPI.LeagueV4.GetAllLeaguePositionsForSummonerAsync(Region.NA, runningGame.Participants[i].SummonerId);
+                foreach (LeaguePosition pos in positions){
+                    string queue = pos.QueueType == "RANKED_SOLO_5x5" ? "Solo/Duo" :
+                                    pos.QueueType == "RANKED_FLEX_SR" ? "Flex" :
+                                    pos.QueueType == "RANKED_FLEX_TT" ? "Treeline" : (pos.QueueType[0] + pos.QueueType.Substring(1).ToLower());
+                    field.Value += $"{queue}: {pos.Tier[0] + pos.Tier.Substring(1).ToLower()} {pos.Rank}\n";
+                }
+                fields.Add(field);
+            }
+            EmbedBuilder toReply = new EmbedBuilder().WithTimestamp(DateTimeOffset.FromUnixTimeMilliseconds(runningGame.GameStartTime));
+            toReply.WithColor(0xff69b4);
+            toReply.WithFooter("Game started");
+            toReply.WithAuthor(new EmbedAuthorBuilder()
+               .WithName(targetSumm.Name)
+               .WithIconUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{targetSumm.ProfileIconId}.png"));
+            toReply.WithFields(fields);
+            await ReplyAsync(embed:toReply.Build());
+        }
+
+
         [Command("rank"), Summary("Search for summoner ranks by name"), Alias("player", "summoner", "r")]
         public async Task byname(params string[] names){
             if (names.Length > _rapi.maxSearchRankedNames){ 
@@ -193,7 +240,8 @@ namespace YunoBot.Commands{
         }
     }
 
-    [Group("admin"), RequireUserPermission(GuildPermission.Administrator),  Name("Admin Commands"), Summary("Server admin commands.\nCan only be called by admins\nof a server.")]
+    [Group("admin"), RequireUserPermission(GuildPermission.Administrator),  Name("Admin Commands")]
+    [Summary("Server admin commands. Can only be called by admins of a server.")]
     public class adminCommands : ModuleBase<SocketCommandContext>{
         
         [Command("list"), Summary("list the admins and lieutenants of a server")]
@@ -237,7 +285,8 @@ namespace YunoBot.Commands{
         
     }
 
-    [Group("Debug"), RequireOwner(), Name("Debug Commands"), Summary("Bot debug and service commands.\nCan only be invoked by my owner.")]
+    [Group("Debug"), RequireOwner(), Name("Debug Commands")]
+    [Summary("Bot debug and service commands. Can only be invoked by my owner.")]
     public class DebugCommands : ModuleBase<SocketCommandContext>{
         private Dictionary<string, Object> allServices;
         public DebugCommands(RapiInfo rapi, CommandHandlingService handlerService){

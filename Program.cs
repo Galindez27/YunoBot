@@ -94,8 +94,6 @@ namespace YunoBot
 
 
         private ServiceProvider ConfigServices(){
-            
-
             return new ServiceCollection()
                 .AddSingleton<DiscordSocketClient>()
                 .AddSingleton<String>(RKEY)
