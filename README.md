@@ -6,11 +6,16 @@
 
 | Group | Command | Description | Max Params |
 | :-----: | ------- | ----------- | ---------- |
-| - | hello | Say hello! | - |
-| - | hello &lt;message> | Echos message | &#8734; |
+| General | hello | Say hello! | - |
+| General | hello &lt;message> | Echos message | &#8734; |
+| General | help | Displays help | - |
+| General | help &lt;group> | Displays help for a specific group | 1 | 
 | search | rank &lt;names> | Searches for Summoners and retrieves their solo queue and flex queue ranks | 5 |
 | search | winrate &lt;names> | Returns the Win/Loss ratio for the last 20 Ranked games (solo or flex) of a player | 1 |
+| search | ingame &lt;name> | Returns a list of summoner ranks from the specified players active game | 1 |
 | admin | list | List important people (defined as those with certain permissions) in a Discord server | - |
+| debug | updateLeague | Update the league patch number remotely | - |
+| debug | allServices | return a list of running services in the collection | - |
 
 For example: <b>`search rank "Yandere Supreme"</b> results in my ranked information being returned. (Im hardstuck Gold IV mid pls help me)
 
@@ -74,4 +79,7 @@ Commands without a group can be invoked directly: <b> `hello</b>
  most of the finer deatails of asynchronous programming, it was quite hard to wrap my brain around the exact nature of
  async. Once I straightened out how exactly async can be used to execute many tasks in parralel, it became quite clear
  that the benefits are enormous for a web based application such as this, allowing computing to be done while waiting on
- information to be recieved and parsed from a remote service. 
+ information to be recieved and parsed from a remote service.
+
+### contact
+ galindez@bu.edu
