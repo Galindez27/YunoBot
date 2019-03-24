@@ -3,6 +3,6 @@
     "botToken": "yourToken",
     "clientSecret": "yourSecret",
     "clientId": -1,
-    "prefix": "*",
+    "prefix": "`",
     "logLevel": 3
 }
