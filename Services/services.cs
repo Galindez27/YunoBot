@@ -123,11 +123,9 @@ namespace YunoBot.Services{
 
                 mainGroupField.IsInline = true;
                 mainGroupField.Name = ":small_red_triangle:" + modInfo.Name;
-                soloGroupHelp.Title = modInfo.Name;
+                soloGroupHelp.Title = modInfo.Name.ToLower();
 
                 string[] summSplit = modInfo.Summary.Split(' ');
-
-                
                 int lineLen = 0;
                 foreach (string word in summSplit){ // Wrap text to 31 characters
                     if (lineLen + word.Length > 31){
@@ -146,15 +144,16 @@ namespace YunoBot.Services{
                 }
 
                 flex = "Commands";
-                foreach (CommandInfo comm in modInfo.Commands){
+                foreach (CommandInfo comm in modInfo.Commands){ // Iterate through commands of each group
                     string soloSumm = "None";
                     string soloAli = "None";
                     string soloFlex = "Arguments";
-                    string soloFlexV = comm.Remarks;
+                    string soloFlexV = comm.Remarks ?? "None";
+                    int numAli = comm.Aliases.Count / modInfo.Aliases.Count;
 
                     flexv += $"{comm.Name} ";
                     EmbedFieldBuilder commandField = new EmbedFieldBuilder();
-                    commandField.Name = comm.Name;
+                    commandField.Name = ":speech_balloon:" + comm.Name;
                     commandField.IsInline = true;
 
                     int linelen = 0;
@@ -163,14 +162,16 @@ namespace YunoBot.Services{
                         foreach (string word in comm.Summary.Split(' ')){ // Wrap text to 31 characters
                             if (linelen + word.Length > 31){
                                 soloSumm += '\n';
+                                linelen = 0;
                             }
-                            soloSumm += word;
+                            soloSumm += word + ' ';
+                            linelen += word.Length + 1;
                         }
                     }
-                    if (comm.Aliases.Count != 0) {
+                    if (numAli != 1) {
                         soloAli = "";
-                        foreach (string alias in comm.Aliases){
-                            soloAli += alias + " ";
+                        for (int i = 1; i < numAli; i++){
+                            soloAli += comm.Aliases[i].Substring(modInfo.Aliases[0].Length) + " ";
                         }
                     }
 

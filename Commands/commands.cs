@@ -20,10 +20,11 @@ using MingweiSamuel.Camille.SpectatorV4;
 using YunoBot.Services; 
 
 namespace YunoBot.Commands{
-    [Name("General Commands.")]
+    [Name("General")]
     [Summary("These commands do not require the <group> argument.")]
     public class General : ModuleBase<SocketCommandContext>{
-        private string[] uwus = {"𝓤𝔀𝓤", "ÚwÚ", "(。U ω U。)", "(⁄˘⁄ ⁄ ω⁄ ⁄ ˘⁄)♡", "end my suffering", "✧･ﾟ: *✧･ﾟ♡*(ᵘʷᵘ)*♡･ﾟ✧*:･ﾟ✧", "𝒪𝓌𝒪", "(⁄ʘ⁄ ⁄ ω⁄ ⁄ ʘ⁄)♡"};
+        private string[] uwus = {"𝓤𝔀𝓤", "ÚwÚ", "(。U ω U。)", "(⁄˘⁄ ⁄ ω⁄ ⁄ ˘⁄)♡", "end my suffering",
+         "✧･ﾟ: *✧･ﾟ♡*(ᵘʷᵘ)*♡･ﾟ✧*:･ﾟ✧", "𝒪𝓌𝒪", "(⁄ʘ⁄ ⁄ ω⁄ ⁄ ʘ⁄)♡", "uwu"};
         private CommandHandlingService _handler;
         RapiInfo _rapi;
 
@@ -48,8 +49,17 @@ namespace YunoBot.Commands{
             await Context.User.SendMessageAsync($"Listed below with :small_red_triangle: are groups. You will also find a small summary of each group, aliases to quickly call them, and commands you can activate.\n\nTo interact with me, you type \n*\\{CommandHandlingService.Prefix}<group> <command> <arguments.>*\n\n For Example, you can type: *\\{CommandHandlingService.Prefix}search rank \"imaqtpie\"* to lookup the best AD in NA!\n\nIf you cannot see the list below, note that this bot requires the embed permission to function properly!", embed:toEmbed);
         }
 
-        
-    
+        [Command("help"), Alias("h", "?", "pls", "wtf", "halp"), Summary("Provide detailed help for a group and commands"), Remarks("<group name>")]
+        public async Task yunoHelpGroup([Remainder()]string remainder){
+            Embed helpMsg = null;
+            if (_handler.getHelp(remainder.ToLower(), out helpMsg)){
+                await Context.User.SendMessageAsync(embed:helpMsg);
+            }
+            else{
+                await Context.User.SendMessageAsync($"Group: {remainder} not found.");
+            }
+        }
+
         [Command("uwu"), Summary("*uwu*")]
         public async Task degenerecy(){
             Random rng = new Random();
@@ -57,7 +67,7 @@ namespace YunoBot.Commands{
         }
     }
 
-    [Group("search"), Alias("s"), Name("Search Commands")]
+    [Group("search"), Alias("s"), Name("Search")]
     [Summary("Search for LoL related information.")]
     public class Search : ModuleBase<SocketCommandContext>{
 
@@ -88,7 +98,7 @@ namespace YunoBot.Commands{
             return match.Teams[playerTeam].Win == "Win";
         }
         
-        [Command("ingame"), Summary("Find the ranks for all other players in the specified player's currently active game")]
+        [Command("ingame"), Summary("Find the ranks for all other players in the specified player's currently active game"), Remarks("<Player Name>")]
         public async Task ingame(string target){
             await Context.Channel.TriggerTypingAsync();
             Summoner targetSumm = null;
@@ -134,7 +144,7 @@ namespace YunoBot.Commands{
         }
 
 
-        [Command("rank"), Summary("Search for summoner ranks by name"), Alias("player", "summoner", "r")]
+        [Command("rank"), Summary("Search for summoner ranks by name"), Alias("player", "summoner", "r"), Remarks("<Player Name>, can do multiple names")]
         public async Task byname(params string[] names){
             if (names.Length > _rapi.maxSearchRankedNames){ 
                 await ReplyAsync($"Too many names! Max of {_rapi.maxSearchRankedNames}.");
@@ -240,7 +250,7 @@ namespace YunoBot.Commands{
         }
     }
 
-    [Group("admin"), RequireUserPermission(GuildPermission.Administrator),  Name("Admin Commands")]
+    [Group("admin"), RequireUserPermission(GuildPermission.Administrator),  Name("Admin")]
     [Summary("Server admin commands. Can only be called by admins of a server.")]
     public class adminCommands : ModuleBase<SocketCommandContext>{
         
@@ -285,7 +295,7 @@ namespace YunoBot.Commands{
         
     }
 
-    [Group("Debug"), RequireOwner(), Name("Debug Commands")]
+    [Group("Debug"), RequireOwner(), Name("Debug")]
     [Summary("Bot debug and service commands. Can only be invoked by my owner.")]
     public class DebugCommands : ModuleBase<SocketCommandContext>{
         private Dictionary<string, Object> allServices;
