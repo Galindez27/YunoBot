@@ -22,41 +22,6 @@ using MingweiSamuel.Camille.MatchV4;
 using YunoBot.Commands;
 
 namespace YunoBot.Services{
-    
-    public class RapiInfo{
-        public RiotApi RAPI;
-        private string PatchNum = "00";
-        
-
-        private int _MaxWinrateNames = 1;
-        private int _MaxRankedNames = 5;
-
-        public string patchNum {get { return PatchNum;}}
-        public int maxSearchRankedNames { get { return _MaxRankedNames;}}
-        public int maxSearchWinrateNames { get { return _MaxWinrateNames;}}
-        
-        public RapiInfo(String key, IServiceProvider services){
-            RAPI = RiotApi.NewInstance(key);
-            updateLeaguePatch().GetAwaiter().GetResult();
-        }
-
-        
-
-        public async Task updateLeaguePatch(){
-            WebRequest temp = WebRequest.Create("https://ddragon.leagueoflegends.com/api/versions.json");
-            WebResponse k = await temp.GetResponseAsync();
-            Stream resp = k.GetResponseStream();
-            StreamReader reader = new StreamReader(resp, System.Text.Encoding.GetEncoding("utf-8"));
-            String jsonString = await reader.ReadToEndAsync();
-            var json = JsonConvert.DeserializeObject<List<String>>(jsonString);
-            lock(PatchNum){
-                PatchNum = json[0];
-            }
-        }
-    }
-
-    
-
     public class CommandHandlingService{
         private readonly CommandService _commands;
         private readonly DiscordSocketClient _discord;

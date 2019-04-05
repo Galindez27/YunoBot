@@ -12,12 +12,12 @@ using YunoBot.Services;
 
 namespace YunoBot
 {
-    class Program
-    {
+    class YunoBot{
         private string CLIENT_ID;
         private string CLIENT_SECRET;
         private string BOT_TOKEN;
         private string RKEY;
+        private string cacheFile;
         static private LogSeverity LogAt = LogSeverity.Info;
 
 
@@ -26,10 +26,8 @@ namespace YunoBot
         private readonly IServiceCollection map = new ServiceCollection();
         private readonly CommandService commands = new CommandService();
         private RapiInfo rapi;
-        
-        static void Main(string[] args)
-            => new Program().MainAsync().GetAwaiter().GetResult();
 
+        
         public static Task Logger(LogMessage message){
         if (message.Severity > LogAt) return Task.CompletedTask;
         var cc = Console.ForegroundColor;
@@ -63,12 +61,12 @@ namespace YunoBot
         // the alternative is to 'return Task.Delay(0);' instead.
         return Task.CompletedTask;
     }
-
         public async Task MainAsync(){
             using (StreamReader tfile = File.OpenText("config.json")){
                 dynamic config = JsonConvert.DeserializeObject(tfile.ReadToEnd());
                 char tempPrefix = config.prefix ?? '`';
                 int tempLevel = config.logLevel ?? 3;
+                cacheFile = config.matchCacheFile ?? "matchCache.lol";
 
                 CLIENT_ID = config.clientId ?? "NONE";
                 CLIENT_SECRET = config.clientSecret ?? "NONE";
@@ -78,21 +76,23 @@ namespace YunoBot
                 CommandHandlingService.setPrefix(tempPrefix);
             }
             await CommandHandlingService.Logger(new LogMessage(LogSeverity.Info, "Config", $"Prefix set to:'{CommandHandlingService.Prefix}'"));
+            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Info, "Config", $"Match cache file set to:'{cacheFile}'"));
             using (var services = ConfigServices()){
                 main_client = services.GetRequiredService<DiscordSocketClient>();
                 services.GetRequiredService<CommandService>().Log += Logger;
                 rapi = services.GetRequiredService<RapiInfo>();
+
+                rapi.setCacheFile(cacheFile);
             
                 main_client.Log += Logger;
                 await main_client.LoginAsync(TokenType.Bot, BOT_TOKEN);
                 await main_client.StartAsync();
                 await services.GetRequiredService<Services.CommandHandlingService>().InitializeAsync();
+
                 
                 await Task.Delay(-1);
             }
         }
-
-
         private ServiceProvider ConfigServices(){
             return new ServiceCollection()
                 .AddSingleton<DiscordSocketClient>()
@@ -103,5 +103,26 @@ namespace YunoBot
                 .BuildServiceProvider();
         }
 
+        ~YunoBot(){
+            rapi = null;
+        }
+    };
+
+    class Program
+    {
+        private static YunoBot running;
+        
+        static void Main(string[] args){
+            running = new YunoBot();
+            Console.CancelKeyPress += endhandler;
+            Console.WriteLine($"{"Datetime",-19} [{"severity",-8}] {"source", -15}| {"message"}");
+            running.MainAsync().GetAwaiter().GetResult();
+        }
+
+        private static void endhandler(object sender, ConsoleCancelEventArgs args){
+            running = null;
+            Task.Delay(1000);
+            Environment.Exit(1);
+        }
      }
 }

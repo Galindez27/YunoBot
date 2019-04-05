@@ -4,7 +4,7 @@ using System.Collections;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Globalization;
 
-using System.Threading;
+using System.Threading.Tasks;
 using System.Timers;
 
 using MingweiSamuel.Camille;
@@ -13,23 +13,50 @@ using MingweiSamuel.Camille.SummonerV4;
 using MingweiSamuel.Camille.MatchV4;
 using MingweiSamuel.Camille.Util;
 
-namespace YunoBot.Services{
-    
-    public class StoredGameCache{
-        public readonly int MaxTableSize;
-        public readonly int MaxCacheTables;
-        public readonly int MaxLoadTables;
+// namespace YunoBot.Services{
+//     [Serializable]
+//     public struct savedGameTable{
+//         long newestDate;
+//         Dictionary<long, StoredMatch> table;
+//     }
 
-        private SortedSet<Dictionary<long, StoredMatch>> _MainSet;
-        private SortedSet<Dictionary<long, StoredMatch>> _LoadSet;
-        private Dictionary<long, long> manifest;
+//     public class StoredGameCache{
+//         private static byte obnum = 0;
 
-        private RapiInfo _rapiInfoService;
+//         public readonly int MaxTableSize;
+//         public readonly int MaxCacheTables;
+//         public readonly int MaxLoadTables;
+
+//         private Queue<savedGameTable> _MainQueue;
+//         private Dictionary<long, savedGameTable> _LoadSet;
+//         private <long> manifest;
+//         private Dictionary<long, string> fileManifest;
+
+//         private RiotApi _rpi;
         
-        public StoredGameCache(RapiInfo rapiInfoServie,int tableSize, int cacheTables, int loadTables){
-            
-        }
-        public StoredGameCache(RapiInfo rapiInfoServie,int tableSize, int cacheTables, int loadTables, Dictionary<long, long> LoadedMan){
-        }
-    }
-}
+//         public StoredGameCache(ref RiotApi api,int tableSize, int cacheTables, int loadTables){
+//             MaxCacheTables = cacheTables;
+//             MaxTableSize = tableSize;
+//             MaxLoadTables = loadTables;
+//             _rpi = api;
+//             manifest = new Dictionary<long, long>();
+//             obnum++;
+//             if (obnum > 1) {throw new InvalidProgramException("More than one game cache object created");}
+//         }
+//         public StoredGameCache(ref RiotApi api,int tableSize, int cacheTables, int loadTables, Dictionary<long, long> LoadedMan, Dictionary<long, string> fileMan){
+//             MaxCacheTables = cacheTables;
+//             MaxTableSize = tableSize;
+//             MaxLoadTables = loadTables;
+//             _rpi = api;
+//             manifest = LoadedMan;
+//             obnum++;
+//             if (obnum > 1) {throw InvalidProgramException("More than one game cache object created");}
+//         }
+
+//         public async Task<StoredMatch> findGame(long toFind){
+//             StoredMatch temp = null;
+//             if ()
+//         }
+        
+//     }
+// }
