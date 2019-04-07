@@ -4,6 +4,7 @@ using Discord.WebSocket;
 
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Net;
 using System;
 using System.IO;
@@ -30,7 +31,7 @@ namespace YunoBot.Services{
     
         private int _MaxWinrateNames = 1;
         private int _MaxRankedNames = 5;
-        private Dictionary<long, StoredMatch> gameCache;
+        private ConcurrentDictionary<long, StoredMatch> gameCache;
 
         public string patchNum {get { return PatchNum;}}
         public int maxSearchRankedNames { get { return _MaxRankedNames;}}
@@ -57,12 +58,12 @@ namespace YunoBot.Services{
         private void pullInGames(){
             using (Stream s = File.OpenRead(cacheFileName)){
                 BinaryFormatter formatter = new BinaryFormatter();
-                Dictionary<long, StoredMatch> temp = formatter.Deserialize(s) as Dictionary<long, StoredMatch>;
+               ConcurrentDictionary<long, StoredMatch> temp = formatter.Deserialize(s) as ConcurrentDictionary<long, StoredMatch>;
                 gameCache = temp;
             }
         }
         private void startNewCache(){
-            gameCache = new Dictionary<long, StoredMatch>();
+            gameCache = new ConcurrentDictionary<long, StoredMatch>();
         }
         
         public void dumpCache(){
@@ -75,9 +76,11 @@ namespace YunoBot.Services{
         public void setCacheFile(string fname){
             cacheFileName = fname;
             if (File.Exists(fname)){
+                CommandHandlingService.Logger(new LogMessage(LogSeverity.Verbose, "RapiInfoService", "Cache file found"));
                 pullInGames();
             }
             else {
+                CommandHandlingService.Logger(new LogMessage(LogSeverity.Verbose, "RapiInfoService", "No cache file found. Starting new cache"));
                 startNewCache();
             }
         }
@@ -91,7 +94,7 @@ namespace YunoBot.Services{
             else {
             await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "RAPI wincheck", $"mref:{id, 11} | Not in cache, retrieving..."));
                 temp = new StoredMatch(await RAPI.MatchV4.GetMatchAsync(Region.NA, id));
-                gameCache.Add(temp.id, temp);
+                gameCache.AddOrUpdate(temp.id, temp, (key, oldValue) => temp);
                 return temp.winners == temp.playerTeams[accId];
             }
         }

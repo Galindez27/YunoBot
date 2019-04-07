@@ -223,6 +223,7 @@ namespace YunoBot.Services{
 
             // the command failed, let's notify the user that something happened.
             await Logger(new LogMessage(LogSeverity.Error, "Comm Execution", $"Failure. Result: {result}"));
+            // await Logger(new LogMessage(LogSeverity.Error, "Comm Execution", $"{result.Error.Value}"))
             await context.User.SendMessageAsync($"Something went wrong!\nReason:{result.ErrorReason}");
         }
 
@@ -235,7 +236,7 @@ namespace YunoBot.Services{
         public async Task MessageReceivedAsync(SocketMessage rawMessage)
         {//modified from example code
             var argPos = 0;
-            await Logger(new LogMessage(LogSeverity.Verbose, "MessageRecieved", $"{rawMessage.Channel}, Author:{rawMessage.Author}"));
+            await Logger(new LogMessage(LogSeverity.Verbose, "MessageRecieved", $"Author:{rawMessage.Author}"));
             if (!rawMessage.Author.IsBot) {await Logger(new LogMessage(LogSeverity.Verbose, "MessageRecieved", rawMessage.ToString()));}
             // Ignore system messages, or messages from other bots
             if (!(rawMessage is SocketUserMessage message)) return;
