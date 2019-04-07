@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Threading.Tasks;
 using System.IO;
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Discord;
 using Discord.Commands;
@@ -83,6 +84,28 @@ namespace YunoBot
                 rapi = services.GetRequiredService<RapiInfo>();
 
                 rapi.setCacheFile(cacheFile);
+
+                try{
+                    await CommandHandlingService.Logger(new LogMessage(LogSeverity.Verbose, "Config", "Testing Riot API Key..."));
+                    MingweiSamuel.Camille.SummonerV4.Summoner trialSummoner = rapi.RAPI.SummonerV4.GetBySummonerName(MingweiSamuel.Camille.Enums.Region.NA, "imaqtpie");
+                    await CommandHandlingService.Logger(new LogMessage(LogSeverity.Verbose, "Config", "API Key passed"));
+                }
+                catch (AggregateException ex){
+                    var respCode = (ex.InnerExceptions[0] as MingweiSamuel.Camille.Util.RiotResponseException).GetResponse().StatusCode;
+                    await CommandHandlingService.Logger(new LogMessage(LogSeverity.Critical, "Config", $"Failed API Key test, response code: {(int)respCode}", ex));
+                    switch(respCode){
+                        case HttpStatusCode.Forbidden:
+                            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Critical, "Config", $"API Key may be out of date! Try renewing the code at https://developer.riotgames.com/ "));
+                            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Critical, "Config", $"Bot can function without Riot API, but all League of Legends data requesting will not work properly."));
+                            break;
+                        case HttpStatusCode.BadRequest:
+                            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Critical, "Config", $"API key passed but tested Summoner did not exist. Possible problem with region", ex));
+                            break;
+                        default:
+                            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Critical, "Config", $"Response name: {respCode.GetType().Name}"));
+                            break;
+                    }
+                }
             
                 main_client.Log += Logger;
                 await main_client.LoginAsync(TokenType.Bot, BOT_TOKEN);

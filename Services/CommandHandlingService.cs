@@ -39,6 +39,8 @@ namespace YunoBot.Services{
         private static Dictionary<string, Embed> _helpMessages;
         private static List<ModuleInfo> _loadedModules;
 
+        public static uint embedColor = 0xff69b4;
+
         public static List<ModuleInfo> LoadedModule {get {return _loadedModules;}}
         public static char Prefix {get { return prefix;}}
         public static Embed GroupHelpMessage {get { return _groupHelpMessage;}}

@@ -39,7 +39,7 @@ namespace YunoBot.Commands{
             }
             EmbedBuilder toEmbed = new EmbedBuilder();
             List<EmbedFieldBuilder> fields = new List<EmbedFieldBuilder>();
-            toEmbed.WithColor(0xff69b4);
+            toEmbed.WithColor(CommandHandlingService.embedColor);
             toEmbed.WithTitle(Context.Guild.Name + "\nImportant People");
             toEmbed.ThumbnailUrl = Context.Guild.IconUrl;
             
