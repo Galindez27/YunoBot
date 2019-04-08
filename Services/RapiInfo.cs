@@ -58,19 +58,23 @@ namespace YunoBot.Services{
         private void pullInGames(){
             using (Stream s = File.OpenRead(cacheFileName)){
                 BinaryFormatter formatter = new BinaryFormatter();
-               ConcurrentDictionary<long, StoredMatch> temp = formatter.Deserialize(s) as ConcurrentDictionary<long, StoredMatch>;
+                ConcurrentDictionary<long, StoredMatch> temp = new ConcurrentDictionary<long, StoredMatch>(formatter.Deserialize(s) as Dictionary<long, StoredMatch>);
                 gameCache = temp;
             }
         }
         private void startNewCache(){
             gameCache = new ConcurrentDictionary<long, StoredMatch>();
         }
-        
+
         public void dumpCache(){
             CommandHandlingService.Logger(new LogMessage(LogSeverity.Info, "RapiInfo", $"Dumping Cache to: {cacheFileName}"));
             using (Stream s = File.Create(cacheFileName)){
                 BinaryFormatter formatter = new BinaryFormatter();
-                formatter.Serialize(s, gameCache);
+                Dictionary<long, StoredMatch> temp = null;
+                lock (gameCache){
+                    temp = new Dictionary<long, StoredMatch>(gameCache);
+                }
+                formatter.Serialize(s, temp);
             }
         }
         public void setCacheFile(string fname){
