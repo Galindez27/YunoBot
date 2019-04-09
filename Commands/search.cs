@@ -157,23 +157,32 @@ namespace YunoBot.Commands{
                 await ReplyAsync($"Too many names entered! Limit: {_rapi.maxSearchWinrateNames}");
                 return;
             }
-            await Context.Channel.TriggerTypingAsync();
-                
-            List<EmbedFieldBuilder> content = new List<EmbedFieldBuilder>();
+
             Summoner topSumm = null;
             int[] qs = {420, 440};
 
             // Iterate through names provided 
             foreach (string target in names){
-                EmbedFieldBuilder field = new EmbedFieldBuilder();
-                field.Name = target; //Define name here incase the summonre is found to not exist, will be overwritten later
+                await Context.Channel.TriggerTypingAsync();
+
+                List<EmbedFieldBuilder> content = new List<EmbedFieldBuilder>();
+                EmbedFieldBuilder wrfield = new EmbedFieldBuilder();
+                EmbedFieldBuilder statsField = new EmbedFieldBuilder();
+                Dictionary<Champion, byte> playedChamps = new Dictionary<Champion, byte>();
+                Dictionary<string, byte> playedRole = new Dictionary<string, byte>();
+                Dictionary<string, byte> playedLanes = new Dictionary<string, byte>();
+                Tuple<Champion, byte> topChamp = null;
+                Tuple<string, byte> topRole = null;
+                Tuple<string, byte> topLane = null;
+
+                wrfield.Name = "Stats";
+                statsField.Name = "Trends";
 
                 Summoner tofind = null;
                 Matchlist mlist = null;
                 double wins = 0, losses = 0, wr;
                 try{
                     tofind = await _rapi.RAPI.SummonerV4.GetBySummonerNameAsync(Region.NA, target) ?? throw new InvalidDataException(); //Throw exception if summoner DNE
-                    field.Name = tofind.Name;
 
                     mlist = await _rapi.RAPI.MatchV4.GetMatchlistAsync(Region.NA, tofind.AccountId, queue:qs, endIndex:20);
                     if (mlist.TotalGames == 0) {throw new InvalidOperationException();} //Throw exception if summoner has no ranked games on record
@@ -181,35 +190,73 @@ namespace YunoBot.Commands{
                     topSumm = topSumm ?? tofind; // Save first valid summoner to top summ
 
                     foreach (MatchReference mref in mlist.Matches){
+                        Champion matchChamp = (Champion)mref.Champion;
+                        if (!playedChamps.TryAdd(matchChamp, (byte)1)){ //If champion is already in dictionarry, increment value
+                            playedChamps[matchChamp]++;
+                        }
+                        if (!playedRole.TryAdd(mref.Role, (byte)1)){ //If role is already on list, increment value
+                            playedRole[mref.Role]++;
+                        }
+                        if (!playedLanes.TryAdd(mref.Lane, (byte)1)){ //If lane is already on list, increment value
+                            playedLanes[mref.Lane]++;
+                        }
+
+                        // Update most played champ
+                        if (topChamp == null){ topChamp = new Tuple<Champion, byte>(matchChamp, (byte)1);}
+                        else if (topChamp.Item2 < playedChamps[matchChamp]) { topChamp = new Tuple<Champion, byte>(matchChamp, playedChamps[matchChamp]);}
+
+                        // Update most played role
+                        if (topRole == null){ topRole = new Tuple<string, byte>(mref.Role, (byte)1);}
+                        else if (topRole.Item2 < playedRole[mref.Role]) { topRole = new Tuple<string, byte>(mref.Role, playedRole[mref.Role]);}
+
+                        // Update most played lane
+                        if (topLane == null){ topLane = new Tuple<string, byte>(mref.Lane, (byte)1);}
+                        else if (topLane.Item2 < playedLanes[mref.Lane]) { topLane = new Tuple<string, byte>(mref.Lane, playedLanes[mref.Lane]);}
+
+                    
                         if (await _rapi.matchIsWin(mref.GameId, tofind.AccountId)) {wins++;} //Query rapi info service to utilize cached games or pull in new ones to calculate WR
                         else {losses++;}
                     }
                     wr = wins / (wins + losses);
-                    field.Value = string.Format("WR: {0:P}\nWins: {1}\nLosses:{2}\n", wr, wins, losses);
+                    wrfield.Value = string.Format("WR: {0:P}\nWins: {1}\nLosses: {2}\n", wr, wins, losses);
+
+                    statsField.Value = string.Format("Fave Lane: {0}\nFave Role: {1}\nFave Champ: {2}",
+                        topLane.Item1[0] + topLane.Item1.Substring(1).ToLower(),
+                        topRole.Item1[0] + topRole.Item1.Substring(1).ToLower(),
+                        topChamp.Item1.Name()[0] + topChamp.Item1.Name().Substring(1).ToLower());
                 }
                 catch (InvalidDataException){
-                    field.Value = "Does not exist";
+                    wrfield.Value = "Does not exist";
+                    statsField.Value = "-";
                 }
                 catch (InvalidOperationException){
-                    field.Value = "No ranked games on record";
+                    wrfield.Value = "No ranked games on record";
+                    statsField.Value = "-";
                 }
                 catch (NullReferenceException nre){ // This catch is required to function properly, not 100% certain where the exception is generated
                     await CommandHandlingService.Logger(new LogMessage(LogSeverity.Warning, "winrate", "Poorly Handled Exception", nre));
-                    field.Value = "Error";
+                    wrfield.Value = "Error";
+                    statsField.Value = "-";
                     topSumm = tofind ?? tofind ?? topSumm;
                 }
 
-                content.Add(field);
-            }
+                content.Add(wrfield);
+                content.Add(statsField);
+
             await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "winrate", "Building embedded message..."));
             EmbedBuilder embeddedMessage = new EmbedBuilder();
-            embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{(topSumm != null ? topSumm.ProfileIconId : 501)}.png");
+            embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/img/champion/tiles/{((tofind != null) ? topChamp.Item1.Name() : "Ahri")}_0.jpg");
             embeddedMessage.WithTitle("Last Twenty Flex/SoloDuo Games");
+            embeddedMessage.WithAuthor(
+                new EmbedAuthorBuilder().WithIconUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{(tofind != null ? tofind.ProfileIconId : 501)}.png")
+                .WithName(tofind == null ? tofind.Name : target)
+            );
             embeddedMessage.WithColor(CommandHandlingService.embedColor);
             embeddedMessage.WithFields(content);
             embeddedMessage.WithCurrentTimestamp();
             embeddedMessage.WithFooter(new EmbedFooterBuilder().WithText("As of"));
-            await ReplyAsync("", embed:embeddedMessage.Build());
+            await Context.Channel.SendMessageAsync("", embed:embeddedMessage.Build());
+            }
         }
     }
 
