@@ -16,6 +16,7 @@
 | admin | list | List important people (defined as those with certain permissions) in a Discord server | - |
 | debug | updateLeague | Update the league patch number remotely | - |
 | debug | allServices | return a list of running services in the collection | - |
+| debug | halt | Stop the running bot |
 
 For example: <b>`search rank "Yandere Supreme"</b> results in my ranked information being returned. (Im hardstuck Gold IV mid pls help me)
 
@@ -38,6 +39,7 @@ Commands without a group can be invoked directly: <b> `hello</b>
 | clientId | Discord Client Id Number, this is the bot's user ID number visible to anyone | No |
 | prefix | The prefix a user should type to trigger a command (ie the '!' in "!hello") | No | ` |
 | logLevel | The Logging Level tracked to standard output| No | 3(info) |
+| matchCache | File path to store the match cache after after exiting. Relative or direct. | No | matchCache.lol |
 
 ### Log Level
 

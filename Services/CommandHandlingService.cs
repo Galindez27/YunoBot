@@ -46,15 +46,14 @@ namespace YunoBot.Services{
         public static Embed GroupHelpMessage {get { return _groupHelpMessage;}}
 
 
-        public CommandHandlingService(IServiceProvider services)
-        {
+        public CommandHandlingService(IServiceProvider services){
             _commands = services.GetRequiredService<CommandService>();
             _discord = services.GetRequiredService<DiscordSocketClient>();
             _services = services;
 
             _commands.Log += Logger;
             _commands.CommandExecuted += CommandExecutedAsync;
-            _discord.MessageReceived += MessageReceivedAsync;
+            _discord.MessageReceived += MessageReceivedAsync;            
         }
         
         public static void setLog(int newLevel){
@@ -233,8 +232,7 @@ namespace YunoBot.Services{
             generateHelp();
         }
 
-        public async Task MessageReceivedAsync(SocketMessage rawMessage)
-        {//modified from example code
+        public async Task MessageReceivedAsync(SocketMessage rawMessage){//modified from example code
             var argPos = 0;
             await Logger(new LogMessage(LogSeverity.Verbose, "MessageRecieved", $"Author:{rawMessage.Author}"));
             if (!rawMessage.Author.IsBot) {await Logger(new LogMessage(LogSeverity.Verbose, "MessageRecieved", rawMessage.ToString()));}
@@ -253,5 +251,7 @@ namespace YunoBot.Services{
                 return;
             }
         }
+    
     }
+
 }
