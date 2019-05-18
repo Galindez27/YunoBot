@@ -19,6 +19,7 @@ using MingweiSamuel.Camille.Util;
 using MingweiSamuel.Camille.SpectatorV4;
 
 using YunoBot.Services;
+using YunoBot.Utils;
 
 namespace YunoBot.Commands{
 
@@ -55,9 +56,35 @@ namespace YunoBot.Commands{
             return match.Teams[playerTeam].Win == "Win";
         }
         
+        private string parsePositions(LeaguePosition[] positions){
+
+            string Value = "";
+            foreach (LeaguePosition pos in positions){
+                    string queue = pos.QueueType == "RANKED_SOLO_5x5" ? "Solo/Duo" :
+                                    pos.QueueType == "RANKED_FLEX_SR" ? "Flex" :
+                                    pos.QueueType == "RANKED_FLEX_TT" ? "Treeline" : (pos.QueueType[0] + pos.QueueType.Substring(1).ToLower());
+                    Value += $"{queue}: {pos.Tier[0] + pos.Tier.Substring(1).ToLower()} {pos.Rank}\n";
+                }
+            return Value;
+        }
+
+        
+        private EmbedFieldBuilder ingameFieldBuilder(CurrentGameParticipant par){
+            EmbedFieldBuilder toReturn = new EmbedFieldBuilder().WithIsInline(true);
+            string champ = ((Champion)par.ChampionId).ToString();
+            toReturn.Name = $"{(par.TeamId == 100 ? ":small_red_triangle:":":small_blue_diamond:")}" + champ[0] + champ.Substring(1).ToLowerInvariant();
+            toReturn.Value = par.SummonerName + "\n";
+            return toReturn;
+        }
+
+
         [Command("ingame"), Summary("Find the ranks for all other players in the specified player's currently active game"), Remarks("<Player Name>")]
         public async Task ingame(string target){
             await Context.Channel.TriggerTypingAsync();
+            if (!nameParser.IsMatch(target)){
+                await ReplyAsync($"{target} not found!");
+                return;
+            }
             Summoner targetSumm = null;
             CurrentGameInfo runningGame = null;
             try {
@@ -73,37 +100,47 @@ namespace YunoBot.Commands{
                 return;
             }
 
-            List<EmbedFieldBuilder> fields =  new List<EmbedFieldBuilder>();
-            
-            for (int i = 0; i < runningGame.Participants.Length; i++) {
-
-                EmbedFieldBuilder field = new EmbedFieldBuilder();
-                field.IsInline = true;
-
-                // Field name is "<team Emoji><Chamion>, first line of value is <searched for emoji><Summoner Name>
-                field.Name = $"{(runningGame.Participants[i].TeamId == 100 ? ":small_red_triangle:" : ":small_blue_diamond:")}{((Champion)runningGame.Participants[i].ChampionId).Name()}";
-                field.Value = $"{(runningGame.Participants[i].SummonerId == targetSumm.Id ? ":small_orange_diamond:" : "")}{runningGame.Participants[i].SummonerName}\n";
-
-                //Iterate through ranks the player holds, currently max of three, and add the information to field value
-                LeaguePosition[] positions = await _rapi.RAPI.LeagueV4.GetAllLeaguePositionsForSummonerAsync(Region.NA, runningGame.Participants[i].SummonerId);
-                foreach (LeaguePosition pos in positions){
-                    string queue = pos.QueueType == "RANKED_SOLO_5x5" ? "Solo/Duo" :
-                                    pos.QueueType == "RANKED_FLEX_SR" ? "Flex" :
-                                    pos.QueueType == "RANKED_FLEX_TT" ? "Treeline" : (pos.QueueType[0] + pos.QueueType.Substring(1).ToLower());
-                    field.Value += $"{queue}: {pos.Tier[0] + pos.Tier.Substring(1).ToLower()} {pos.Rank}\n";
-                }
-                fields.Add(field); //Summoner field complete, add to field list and move to next player in game
+            string queueType;
+            _rapi.RankedQueueIdToName.TryGetValue((int)runningGame.GameQueueConfigId, out queueType);
+            List<Task<LeaguePosition[]>> lookupTable = new List<Task<LeaguePosition[]>>();
+            Dictionary<string, EmbedFieldBuilder> fieldsTable = new Dictionary<string, EmbedFieldBuilder>();
+            foreach (var player in runningGame.Participants){
+                lookupTable.Add(_rapi.RAPI.LeagueV4.GetAllLeaguePositionsForSummonerAsync(Region.NA, player.SummonerId));
+                fieldsTable.Add(player.SummonerId, ingameFieldBuilder(player));
             }
+
+            while (lookupTable.Count != 0){
+                var completedLookup = await Task.WhenAny(lookupTable);
+                try {
+                    fieldsTable[(completedLookup.Result[0].SummonerId)].Value += parsePositions(completedLookup.Result);
+                    string flagLine = "None";
+                    foreach(var pos in completedLookup.Result){
+                        if (pos.QueueType == queueType){
+                            flagLine = FlagOrgan.getRankedEmojis(FlagOrgan.getRankedFlags(pos));
+                            break;
+                        }
+                    }
+                    fieldsTable[(completedLookup.Result[0].SummonerId)].Value += "*flags*\n" + flagLine;
+                    lookupTable.Remove(completedLookup);
+                }
+                catch (NullReferenceException){ // Summoner has no ranked positions on file, just skip any further computation
+                    lookupTable.Remove(completedLookup);
+                }
+            }
+
+            
+            
 
             EmbedBuilder toReply = new EmbedBuilder();
             DateTimeOffset gameStart = runningGame.GameStartTime != 0 ? DateTimeOffset.FromUnixTimeMilliseconds(runningGame.GameStartTime) : DateTimeOffset.Now; // Sometimes game start time was reporting 0, or 1969, so this gives an estimate if the value is zero
             toReply.WithColor(CommandHandlingService.embedColor);
             toReply.WithFooter("Game started");
+            toReply.WithTimestamp(gameStart);
             toReply.WithAuthor(new EmbedAuthorBuilder()
                .WithName(targetSumm.Name)
                .WithIconUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{targetSumm.ProfileIconId}.png"));
-            toReply.WithFields(fields);
-            await ReplyAsync(embed:toReply.Build());
+            toReply.WithFields(fieldsTable.Values);
+            await ReplyAsync("Emoji flag legend: " + FlagOrgan.RankedEmojiLegend ,embed:toReply.Build());
         }
 
         [Command("rank"), Summary("Search for summoner ranks by name"), Alias("player", "summoner", "r"), Remarks("<Player Name>, can do multiple names")]
@@ -169,7 +206,7 @@ namespace YunoBot.Commands{
                 return;
             }
 
-            Summoner topSumm = null;
+            Summoner topSumm = null; //Holds the first valid summoner from the names param.
             int[] qs = {420, 440};
 
             // Iterate through names provided 
@@ -183,14 +220,16 @@ namespace YunoBot.Commands{
                     Dictionary<Champion, byte> playedChamps = new Dictionary<Champion, byte>();
                     Dictionary<string, byte> playedRole = new Dictionary<string, byte>();
                     Dictionary<string, byte> playedLanes = new Dictionary<string, byte>();
-                    Tuple<Champion, byte> topChamp = null;
-                    Tuple<string, byte> topRole = null;
-                    Tuple<string, byte> topLane = null;
+                    
+                    KeyValuePair<Champion, byte> topChamp = new KeyValuePair<Champion, byte>(Champion.AHRI, 0);
+                    KeyValuePair<string, byte> topRole = new KeyValuePair<string, byte>("NONE", 0);
+                    KeyValuePair<string, byte> topLane = new KeyValuePair<string, byte>("NONE", 0);
 
                     wrfield.Name = "Stats";
                     statsField.Name = "Trends";
 
                     Summoner tofind = null;
+
                     Matchlist mlist = null;
                     double wins = 0, losses = 0, wr;
                     try{
@@ -201,41 +240,40 @@ namespace YunoBot.Commands{
                         
                         topSumm = topSumm ?? tofind; // Save first valid summoner to top summ
 
-                        foreach (MatchReference mref in mlist.Matches){
-                            Champion matchChamp = (Champion)mref.Champion;
-                            if (!playedChamps.TryAdd(matchChamp, (byte)1)){ //If champion is already in dictionarry, increment value
-                                playedChamps[matchChamp]++;
+                        Task<bool>[] wrCalTasks = new Task<bool>[mlist.Matches.Length];
+                        for (int i = 0; i < mlist.Matches.Length; i++){
+                            wrCalTasks[i] = _rapi.matchIsWin(mlist.Matches[i].GameId, tofind.AccountId);
+                        }
+
+                        foreach (MatchReference gameRef in mlist.Matches){
+                            byte number;
+                            if (playedChamps.TryGetValue((Champion)gameRef.Champion, out number)){
+                                playedChamps[(Champion)gameRef.Champion]++;
+                                if (number > topChamp.Value){ topChamp = new KeyValuePair<Champion, byte>((Champion)gameRef.Champion, playedChamps[(Champion)gameRef.Champion]);}
                             }
-                            if (!playedRole.TryAdd(mref.Role, (byte)1)){ //If role is already on list, increment value
-                                playedRole[mref.Role]++;
+                            else { playedChamps.Add((Champion)gameRef.Champion, 1);}
+
+                            if (playedLanes.TryGetValue(gameRef.Lane, out number)){
+                                playedLanes[gameRef.Lane]++;
+                                if (number > topLane.Value){ topLane = new KeyValuePair<string, byte>(gameRef.Lane, playedLanes[gameRef.Lane]);}
                             }
-                            if (!playedLanes.TryAdd(mref.Lane, (byte)1)){ //If lane is already on list, increment value
-                                playedLanes[mref.Lane]++;
+                            else { playedLanes.Add(gameRef.Lane, 1); }
+
+                            if (playedRole.TryGetValue(gameRef.Role, out number)){
+                                playedRole[gameRef.Role]++;
+                                if (number > topRole.Value){ topRole = new KeyValuePair<string, byte>(gameRef.Role, playedRole[gameRef.Role]);}
                             }
-
-                            // Update most played champ
-                            if (topChamp == null){ topChamp = new Tuple<Champion, byte>(matchChamp, (byte)1);}
-                            else if (topChamp.Item2 < playedChamps[matchChamp]) { topChamp = new Tuple<Champion, byte>(matchChamp, playedChamps[matchChamp]);}
-
-                            // Update most played role
-                            if (topRole == null){ topRole = new Tuple<string, byte>(mref.Role, (byte)1);}
-                            else if (topRole.Item2 < playedRole[mref.Role]) { topRole = new Tuple<string, byte>(mref.Role, playedRole[mref.Role]);}
-
-                            // Update most played lane
-                            if (topLane == null){ topLane = new Tuple<string, byte>(mref.Lane, (byte)1);}
-                            else if (topLane.Item2 < playedLanes[mref.Lane]) { topLane = new Tuple<string, byte>(mref.Lane, playedLanes[mref.Lane]);}
-
-                            // Query rapi info service to utilize cached games or pull in new ones to calculate WR
-                            if (await _rapi.matchIsWin(mref.GameId, tofind.AccountId)) {wins++;} 
-                            else {losses++;}
+                            else { playedRole.Add(gameRef.Role, 1); }
+                        }
+                        
+                        Task.WaitAll(wrCalTasks);
+                        foreach (var winTask in wrCalTasks){
+                            if (winTask.Result){ wins++; }
+                            else { losses++; }
                         }
                         wr = wins / (wins + losses);
-                        wrfield.Value = string.Format("WR: {0:P}\nWins: {1}\nLosses: {2}\n", wr, wins, losses);
-
-                        statsField.Value = string.Format("Fave Lane: {0}\nFave Role: {1}\nFave Champ: {2}",
-                            topLane.Item1[0] + topLane.Item1.Substring(1).ToLower(),
-                            topRole.Item1[0] + topRole.Item1.Substring(1).ToLower(),
-                            topChamp.Item1.Name()[0] + topChamp.Item1.Name().Substring(1).ToLower());
+                        wrfield.Value = string.Format("WR: {0:P}\nWins: {1}\nLosses: {2}", wr, wins, losses);
+                        statsField.Value = string.Format("Fave Champ: {0}\nFave Lane: {1}\nFave Role: {2}", topChamp.Key, topLane.Key, topRole.Key);
                     }
                     catch (InvalidDataException){
                         wrfield.Value = "Does not exist";
@@ -256,7 +294,7 @@ namespace YunoBot.Commands{
 
                     await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "winrate", "Building embedded message..."));
                     EmbedBuilder embeddedMessage = new EmbedBuilder();
-                    embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/img/champion/tiles/{((tofind != null) ? topChamp.Item1.Name() : "Ahri")}_0.jpg");
+                    embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/img/champion/tiles/{((tofind != null) ? topChamp.Key.Name() : "Ahri")}_0.jpg");
                     embeddedMessage.WithTitle("Last Twenty Flex/SoloDuo Games");
                     embeddedMessage.WithAuthor(
                         new EmbedAuthorBuilder().WithIconUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{(tofind != null ? tofind.ProfileIconId : 501)}.png")

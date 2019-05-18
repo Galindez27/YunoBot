@@ -46,7 +46,7 @@ namespace YunoBot.Commands{
         [Command("help"), Alias("h", "?", "pls", "wtf", "halp"), Summary("Reply with some helpful info!")]
         public async Task yunoHelp(){
             Embed toEmbed = CommandHandlingService.GroupHelpMessage;
-            await Context.User.SendMessageAsync($"Listed below with :small_red_triangle: are groups. You will also find a small summary of each group, aliases to quickly call them, and commands you can activate.\n\nTo interact with me, you type \n*\\{CommandHandlingService.Prefix}<group> <command> <arguments.>*\n\n For Example, you can type: *\\{CommandHandlingService.Prefix}search rank \"imaqtpie\"* to lookup the best AD in NA!\n\nIf you cannot see the list below, note that this bot requires the embed permission to function properly!", embed:toEmbed);
+            await Context.User.SendMessageAsync(string.Format(CommandHandlingService.MainHelpText, CommandHandlingService.Prefix, CommandHandlingService.Prefix), embed:toEmbed);
         }
 
         [Command("help"), Alias("h", "?", "pls", "wtf", "halp"), Summary("Provide detailed help for a group and commands"), Remarks("<group name>")]

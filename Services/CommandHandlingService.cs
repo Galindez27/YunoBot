@@ -34,7 +34,7 @@ namespace YunoBot.Services{
         public readonly string HelpMessage;
 
         private static LogSeverity LogAt = LogSeverity.Info;
-        private static char prefix;
+        private static string prefix;
         private static Embed _groupHelpMessage;
         private static Dictionary<string, Embed> _helpMessages;
         private static List<ModuleInfo> _loadedModules;
@@ -42,9 +42,10 @@ namespace YunoBot.Services{
         public static uint embedColor = 0xff69b4;
 
         public static List<ModuleInfo> LoadedModule {get {return _loadedModules;}}
-        public static char Prefix {get { return prefix;}}
+        public static string Prefix {get { return prefix;}}
         public static Embed GroupHelpMessage {get { return _groupHelpMessage;}}
 
+        public static readonly string MainHelpText = "Listed below with :small_red_triangle: are groups. You will also find a small summary of each group, aliases to quickly call them, and commands you can activate.\n\nTo interact with me, you type \n*{0}<group> <command> <arguments.>*\n\n For Example, you can type: *{1}search rank \"imaqtpie\"* to lookup the best AD in NA!\n\nIf you cannot see the list below, note that this bot requires the embed permission to function properly!";
 
         public CommandHandlingService(IServiceProvider services){
             _commands = services.GetRequiredService<CommandService>();
@@ -201,7 +202,7 @@ namespace YunoBot.Services{
         return Task.CompletedTask;
     }
 
-        public static void setPrefix(char newPrefix){
+        public static void setPrefix(string newPrefix){
             prefix = newPrefix;
         }
         public async Task CommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)
@@ -239,7 +240,7 @@ namespace YunoBot.Services{
             // Ignore system messages, or messages from other bots
             if (!(rawMessage is SocketUserMessage message)) return;
             if (message.Source != MessageSource.User) return;
-            if (message.HasCharPrefix(prefix, ref argPos)){
+            if (message.HasStringPrefix(prefix, ref argPos)){
                 var context = new SocketCommandContext(_discord, message);
                 await _commands.ExecuteAsync(context, argPos, _services); // we will handle the result in CommandExecutedAsync
                 return;

@@ -37,10 +37,22 @@ namespace YunoBot.Services{
         public int maxSearchRankedNames { get { return _MaxRankedNames;}}
         public int maxSearchWinrateNames { get { return _MaxWinrateNames;}}
 
+        public readonly ConcurrentDictionary<string, int> RankedQueueNameToId;
+        public readonly ConcurrentDictionary<int, string> RankedQueueIdToName;
+
         
-        public RapiInfo(String key, IServiceProvider services){
+        public RapiInfo(String key){
             RAPI = RiotApi.NewInstance(key);
             updateLeaguePatch().GetAwaiter().GetResult();
+
+            RankedQueueNameToId = new ConcurrentDictionary<string, int>();
+            RankedQueueIdToName = new ConcurrentDictionary<int, string>();
+            RankedQueueNameToId.TryAdd(Queue.RANKED_FLEX_SR, 440);
+            RankedQueueNameToId.TryAdd(Queue.RANKED_SOLO_5x5, 420);
+            RankedQueueNameToId.TryAdd(Queue.RANKED_FLEX_TT, 470);
+            foreach (var x in RankedQueueNameToId.Keys){
+                RankedQueueIdToName.TryAdd(RankedQueueNameToId[x], x);
+            }
         }
 
         public async Task updateLeaguePatch(){
@@ -92,13 +104,13 @@ namespace YunoBot.Services{
         public async Task<bool> matchIsWin(long id, string accId){
             StoredMatch temp = null;
             if (gameCache.TryGetValue(id, out temp)){
-            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "RAPI wincheck", $"mref:{id, 11} | Found in cache"));
+                await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "RAPI wincheck", $"mref:{id, 11} | Found in cache"));
                 return temp.winners == temp.playerTeams[accId];
             }
             else {
-            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "RAPI wincheck", $"mref:{id, 11} | Not in cache, retrieving..."));
+                await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "RAPI wincheck", $"mref:{id, 11} | Not in cache, retrieving..."));
                 temp = new StoredMatch(await RAPI.MatchV4.GetMatchAsync(Region.NA, id));
-                gameCache.AddOrUpdate(temp.id, temp, (key, oldValue) => temp);
+                gameCache.TryAdd(temp.id, temp);
                 return temp.winners == temp.playerTeams[accId];
             }
         }

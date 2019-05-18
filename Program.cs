@@ -65,7 +65,7 @@ namespace YunoBot
         public async Task MainAsync(){
             using (StreamReader tfile = File.OpenText("config.json")){
                 dynamic config = JsonConvert.DeserializeObject(tfile.ReadToEnd());
-                char tempPrefix = config.prefix ?? '`';
+                string tempPrefix = config.prefix ?? "`";
                 int tempLevel = config.logLevel ?? 3;
                 cacheFile = config.matchCacheFile ?? "matchCache.lol";
 
