@@ -26,48 +26,42 @@ namespace YunoBot.Commands{
     [Group("search"), Alias("s"), Name("Search")]
     [Summary("Search for LoL related information.")]
     public class Search : ModuleBase<SocketCommandContext>{
-
+        // Local Variables --------------------------
         private RapiInfo _rapi;
-        Regex nameParser;
+        private Regex nameParser;
+        private string champArtUrlBase = "http://ddragon.leagueoflegends.com/cdn/img/champion/tiles/{0}_0.jpg"; // 0 - Champion name
+        private string summonerIconUrlBase = "http://ddragon.leagueoflegends.com/cdn/{0}/img/profileicon/{1}.png"; // 0 - Patch number, 1 - Icon ID
 
         public Search(RapiInfo rpi){
             _rapi = rpi;
             nameParser = new Regex("^[0-9\\p{L} _\\.]+$");
         }
 
-        [Obsolete]
-        private async Task<bool> isWin(long game, Summoner tocheck){
-            await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "isWin Check", $"GameID:{game}, PlayerACC:{tocheck.AccountId}, Name:{tocheck.Name}"));
-            var match = await _rapi.RAPI.MatchV4.GetMatchAsync(Region.NA, game);
-            int playerId = -1;
-            int playerTeam = -1;
-            int playerTeamId = -1;
-            foreach (var part in match.ParticipantIdentities){
-                if (part.Player.CurrentAccountId == tocheck.AccountId){
-                    playerId = part.ParticipantId - 1;
-                    playerTeamId = match.Participants[playerId].TeamId;
-                    playerTeam = (playerTeamId == 100) ? 0 : 1;
-                    break;
-                }
-            }
-            if (match.Teams[playerTeam].TeamId != playerTeamId){
-                throw new IndexOutOfRangeException($"TeamId found:{playerTeamId}, Team index made:{playerTeam}, TeamId in index reached:{match.Teams[playerTeam].TeamId}");
-            }
-            return match.Teams[playerTeam].Win == "Win";
-        }
-        
+        // Helper Functions -----------------
         private string parsePositions(LeaguePosition[] positions){
-
             string Value = "";
-            foreach (LeaguePosition pos in positions){
+            if (positions.Length == 0){ Value = "Unranked";}
+            else {
+                foreach (LeaguePosition pos in positions){
                     string queue = pos.QueueType == "RANKED_SOLO_5x5" ? "Solo/Duo" :
                                     pos.QueueType == "RANKED_FLEX_SR" ? "Flex" :
                                     pos.QueueType == "RANKED_FLEX_TT" ? "Treeline" : (pos.QueueType[0] + pos.QueueType.Substring(1).ToLower());
                     Value += $"{queue}: {pos.Tier[0] + pos.Tier.Substring(1).ToLower()} {pos.Rank}\n";
                 }
+            }
             return Value;
         }
 
+        private string championPicUrl(Champion champ){
+                    switch (champ){
+                        case Champion.KAI_SA:
+                            return string.Format(champArtUrlBase, "Kaisa");
+                        case Champion.NUNU_WILLUMP:
+                            return string.Format(champArtUrlBase, "Nunu");
+                        default:
+                            return string.Format(champArtUrlBase, champ.Name());                                
+                    }
+        }
         
         private EmbedFieldBuilder ingameFieldBuilder(CurrentGameParticipant par){
             EmbedFieldBuilder toReturn = new EmbedFieldBuilder().WithIsInline(true);
@@ -77,6 +71,7 @@ namespace YunoBot.Commands{
             return toReturn;
         }
 
+        // -----------------------------------
 
         [Command("ingame"), Summary("Find the ranks for all other players in the specified player's currently active game"), Remarks("<Player Name>")]
         public async Task ingame(string target){
@@ -130,15 +125,18 @@ namespace YunoBot.Commands{
 
             
             
+            string queueName;
+            if (!_rapi.RankedQueueIdToName.TryGetValue((int)runningGame.GameQueueConfigId, out queueName))
+                queueName = "Unranked";
 
             EmbedBuilder toReply = new EmbedBuilder();
             DateTimeOffset gameStart = runningGame.GameStartTime != 0 ? DateTimeOffset.FromUnixTimeMilliseconds(runningGame.GameStartTime) : DateTimeOffset.Now; // Sometimes game start time was reporting 0, or 1969, so this gives an estimate if the value is zero
             toReply.WithColor(CommandHandlingService.embedColor);
-            toReply.WithFooter("Game started");
+            toReply.WithFooter($"{queueName} - Game Start");
             toReply.WithTimestamp(gameStart);
             toReply.WithAuthor(new EmbedAuthorBuilder()
                .WithName(targetSumm.Name)
-               .WithIconUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{targetSumm.ProfileIconId}.png"));
+               .WithIconUrl(string.Format(summonerIconUrlBase, _rapi.patchNum, targetSumm.ProfileIconId)));
             toReply.WithFields(fieldsTable.Values);
             await ReplyAsync("Emoji flag legend: " + FlagOrgan.RankedEmojiLegend ,embed:toReply.Build());
         }
@@ -273,7 +271,7 @@ namespace YunoBot.Commands{
                         }
                         wr = wins / (wins + losses);
                         wrfield.Value = string.Format("WR: {0:P}\nWins: {1}\nLosses: {2}", wr, wins, losses);
-                        statsField.Value = string.Format("Fave Champ: {0}\nFave Lane: {1}\nFave Role: {2}", topChamp.Key, topLane.Key, topRole.Key);
+                        statsField.Value = string.Format("Fave Champ: {0}\nFave Lane: {1}\nFave Role: {2}", topChamp.Key.Name(), topLane.Key, topRole.Key);
                     }
                     catch (InvalidDataException){
                         wrfield.Value = "Does not exist";
@@ -292,12 +290,13 @@ namespace YunoBot.Commands{
                     content.Add(wrfield);
                     content.Add(statsField);
 
+                    
                     await CommandHandlingService.Logger(new LogMessage(LogSeverity.Debug, "winrate", "Building embedded message..."));
                     EmbedBuilder embeddedMessage = new EmbedBuilder();
-                    embeddedMessage.WithThumbnailUrl($"http://ddragon.leagueoflegends.com/cdn/img/champion/tiles/{((tofind != null) ? topChamp.Key.Name() : "Ahri")}_0.jpg");
+                    embeddedMessage.WithThumbnailUrl(championPicUrl(topChamp.Key));
                     embeddedMessage.WithTitle("Last Twenty Flex/SoloDuo Games");
                     embeddedMessage.WithAuthor(
-                        new EmbedAuthorBuilder().WithIconUrl($"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{(tofind != null ? tofind.ProfileIconId : 501)}.png")
+                        new EmbedAuthorBuilder().WithIconUrl(string.Format(summonerIconUrlBase, _rapi.patchNum, (topSumm != null ? topSumm.ProfileIconId : 501)))
                         .WithName(tofind == null ? tofind.Name : target)
                     );
                     embeddedMessage.WithColor(CommandHandlingService.embedColor);
