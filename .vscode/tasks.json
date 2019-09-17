@@ -4,9 +4,9 @@
         {
             "label": "build",
             "command": "dotnet",
-            "type": "process",
+            "type": "shell",
             "args": [
-                "build",
+                "run",
                 "${workspaceFolder}/YunoBot.csproj"
             ],
             "problemMatcher": "$msCompile",
