@@ -30,39 +30,36 @@ namespace YunoBot
 
         
         public static Task Logger(LogMessage message){
-        if (message.Severity > LogAt) return Task.CompletedTask;
-        var cc = Console.ForegroundColor;
-        switch (message.Severity)
-        {
-            case LogSeverity.Critical:
-                Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                break;
-            case LogSeverity.Error:
-                Console.ForegroundColor = ConsoleColor.Red;
-                break;
-            case LogSeverity.Warning:
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                break;
-            case LogSeverity.Info:
-                Console.ForegroundColor = ConsoleColor.White;
-                break;
-            case LogSeverity.Verbose:
-            case LogSeverity.Debug:
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                break;
+            if (message.Severity > LogAt) return Task.CompletedTask;
+            var cc = Console.ForegroundColor;
+            switch (message.Severity)
+            {
+                case LogSeverity.Critical:
+                    Console.ForegroundColor = ConsoleColor.DarkRed;
+                    break;
+                case LogSeverity.Error:
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    break;
+                case LogSeverity.Warning:
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    break;
+                case LogSeverity.Info:
+                    Console.ForegroundColor = ConsoleColor.White;
+                    break;
+                case LogSeverity.Verbose:
+                case LogSeverity.Debug:
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    break;
+            }
+            Console.WriteLine($"{DateTime.Now,-19} [{message.Severity,-8}] {message.Source, -15}| {message.Message}");
+            Console.ForegroundColor = cc;
+            
+            return Task.CompletedTask;
         }
-        Console.WriteLine($"{DateTime.Now,-19} [{message.Severity,-8}] {message.Source, -15}| {message.Message}");
-        Console.ForegroundColor = cc;
         
-        // If you get an error saying 'CompletedTask' doesn't exist,
-        // your project is targeting .NET 4.5.2 or lower. You'll need
-        // to adjust your project's target framework to 4.6 or higher
-        // (instructions for this are easily Googled).
-        // If you *need* to run on .NET 4.5 for compat/other reasons,
-        // the alternative is to 'return Task.Delay(0);' instead.
-        return Task.CompletedTask;
-    }
         public async Task MainAsync(){
+
+            /* Read Config file and fill in appropriate variables */
             using (StreamReader tfile = File.OpenText("config.json")){
                 dynamic config = JsonConvert.DeserializeObject(tfile.ReadToEnd());
                 string tempPrefix = config.prefix ?? "`";
@@ -108,14 +105,17 @@ namespace YunoBot
                 }
             
                 main_client.Log += Logger;
-                await main_client.LoginAsync(TokenType.Bot, BOT_TOKEN);
+                try {await main_client.LoginAsync(TokenType.Bot, BOT_TOKEN);}
+                catch(Discord.Net.HttpException ex){
+                    await Logger(new LogMessage(LogSeverity.Critical, "Config", "Could not login to Discord. Check token in config.json.", ex));
+                    Environment.Exit(-1);                    
+                }
                 await main_client.StartAsync();
                 await services.GetRequiredService<Services.CommandHandlingService>().InitializeAsync();
-
-                
                 await Task.Delay(-1);
             }
         }
+        
         private ServiceProvider ConfigServices(){
             return new ServiceCollection()
                 .AddSingleton<DiscordSocketClient>()
@@ -128,6 +128,7 @@ namespace YunoBot
 
         ~YunoBot(){
             rapi = null;
+            Console.WriteLine($"{DateTime.Now} Deconstructed YunoBot");
         }
     };
 
@@ -144,7 +145,7 @@ namespace YunoBot
 
         private static void endhandler(object sender, ConsoleCancelEventArgs args){
             running = null;
-            Task.Delay(1000);
+            GC.Collect();
             Environment.Exit(1);
         }
      }

@@ -40,6 +40,8 @@ namespace YunoBot.Services{
         public readonly ConcurrentDictionary<string, int> RankedQueueNameToId;
         public readonly ConcurrentDictionary<int, string> RankedQueueIdToName;
 
+        public readonly Region CurrRegion = Region.NA;
+
         
         public RapiInfo(String key){
             RAPI = RiotApi.NewInstance(key);

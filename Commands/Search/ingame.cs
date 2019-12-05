@@ -49,13 +49,43 @@ namespace YunoBot.Commands{
                 return;
             }
 
+            //Find the queue type, create a dictionary to be filled with players needing to be looked up
+            _rapi.RankedQueueIdToName.TryGetValue((int)runningGame.GameQueueConfigId, out queueType);
+            Dictionary<string, EmbedFieldBuilder> fieldsTable = new Dictionary<string, EmbedFieldBuilder>();
+            Task<LeagueEntry[]>[] lookupList = new Task<LeagueEntry[]>[runningGame.Participants.Length];
+            for (int i =0; i < runningGame.Participants.Length; i++){
+                lookupList[i] = (_rapi.RAPI.LeagueV4.GetLeagueEntriesForSummonerAsync(_rapi.CurrRegion, runningGame.Participants[i].SummonerId));
+                fieldsTable.Add(runningGame.Participants[i].SummonerId, ingameFieldBuilder(runningGame.Participants[i]));
+                fieldsTable[runningGame.Participants[i].SummonerId].Value = runningGame.Participants[i].SummonerName + '\n'; //Adds the player name as the first field value
+            }
 
+            //Await all player ranks to be found then add them to the fields.
+            Task.WaitAll(lookupList);
+            foreach (var playerRank in lookupList){
+                if(playerRank.Result.Length != 0){
+                    fieldsTable[playerRank.Result[0].SummonerId].Value += parsePositions(playerRank.Result);
+                }
+            }
+
+            //Resolve string name to be unranked if playing an unranked queue
+            string queueName;
+            if (!_rapi.RankedQueueIdToName.TryGetValue((int)runningGame.GameQueueConfigId, out queueName))
+                queueName = "Unranked";
+
+            EmbedBuilder toReply = new EmbedBuilder();
+            DateTimeOffset gameStart = runningGame.GameStartTime != 0 ? DateTimeOffset.FromUnixTimeMilliseconds(runningGame.GameStartTime) : DateTimeOffset.Now; // Sometimes game start time was reporting 0, or 1969, so this gives an estimate if the value is zero
+            toReply.WithColor(CommandHandlingService.embedColor);
+            toReply.WithFooter($"{queueName} - Game Start");
+            toReply.WithTimestamp(gameStart);
+            toReply.WithAuthor(new EmbedAuthorBuilder()
+               .WithName(targetSumm.Name)
+               .WithIconUrl(string.Format(summonerIconUrlBase, _rapi.patchNum, targetSumm.ProfileIconId)));
+            toReply.WithFields(fieldsTable.Values);
+            await ReplyAsync(embed : toReply.Build());
         }
 
     }
 }
-
-
 //             string queueType;
 //             _rapi.RankedQueueIdToName.TryGetValue((int)runningGame.GameQueueConfigId, out queueType);
 //             List<Task<LeaguePosition[]>> lookupTable = new List<Task<LeaguePosition[]>>();
@@ -84,10 +114,4 @@ namespace YunoBot.Commands{
 //                 }
 //             }
 
-//         private EmbedFieldBuilder ingameFieldBuilder(CurrentGameParticipant par){
-//             EmbedFieldBuilder toReturn = new EmbedFieldBuilder().WithIsInline(true);
-//             string champ = ((Champion)par.ChampionId).ToString();
-//             toReturn.Name = $"{(par.TeamId == 100 ? ":small_red_triangle:":":small_blue_diamond:")}" + champ[0] + champ.Substring(1).ToLowerInvariant();
-//             toReturn.Value = par.SummonerName + "\n";
-//             return toReturn;
-//         }
+//         

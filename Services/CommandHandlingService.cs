@@ -174,7 +174,7 @@ namespace YunoBot.Services{
         switch (message.Severity)
         {
             case LogSeverity.Critical:
-                Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                Console.ForegroundColor = ConsoleColor.DarkRed;
                 break;
             case LogSeverity.Error:
                 Console.ForegroundColor = ConsoleColor.Red;

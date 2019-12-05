@@ -1,22 +1,11 @@
-﻿using Discord;
+﻿/*
+    Search module declaration. All riot API search commands will be attached TO this class. 
+ */
+
+
 using Discord.Commands;
-using Discord.WebSocket;
-
-using System;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Net;
-using System.IO;
-using System.Reflection;
 
-using MingweiSamuel.Camille;
-using MingweiSamuel.Camille.Enums;
-using MingweiSamuel.Camille.SummonerV4;
-using MingweiSamuel.Camille.LeagueV4;
-using MingweiSamuel.Camille.MatchV4;
-using MingweiSamuel.Camille.Util;
-using MingweiSamuel.Camille.SpectatorV4;
 
 using YunoBot.Services;
 
@@ -110,61 +99,6 @@ namespace YunoBot.Commands{
 //             await ReplyAsync("Emoji flag legend: " + FlagOrgan.RankedEmojiLegend ,embed:toReply.Build());
 //         }
 
-//         [Command("rank"), Summary("Search for summoner ranks by name"), Alias("player", "summoner", "r"), Remarks("<Player Name>, can do multiple names")]
-//         public async Task byname(params string[] names){
-//             // Catch violation of constraints
-//             if (names.Length > _rapi.maxSearchRankedNames){ 
-//                 await ReplyAsync($"Too many names! Max of {_rapi.maxSearchRankedNames}.");
-//                 return;
-//             }
-            
-//             await Context.Channel.TriggerTypingAsync();
-
-//             EmbedBuilder toEmbed = new EmbedBuilder();
-//             List<EmbedFieldBuilder> fieldList = new List<EmbedFieldBuilder>();
-//             Summoner topSumm = null;
-
-//             // Iterate through names given to bot
-//             foreach (string target in names){
-//                 EmbedFieldBuilder tempField = new EmbedFieldBuilder();
-//                 tempField.Name = target;
-//                 tempField.IsInline = true;
-
-//                 if (nameParser.IsMatch(target)){
-//                     Summoner summTarget = null;
-//                     LeaguePosition[] positions = null;
-
-//                     try {
-//                         summTarget = await _rapi.RAPI.SummonerV4.GetBySummonerNameAsync(Region.NA, target) ?? throw new InvalidDataException(); // The search returns null if the summoner doesnt exist throw an error to catch it
-//                         topSumm = topSumm ?? summTarget; //When the first valid summoner is found, save it as topSumm 
-//                         positions = await _rapi.RAPI.LeagueV4.GetAllLeaguePositionsForSummonerAsync(Region.NA, summTarget.Id);
-                        
-//                         // Add summoner level to the field and then add all ranks for different queues
-//                         tempField.Value = $"Level: {summTarget.SummonerLevel}\n";
-//                         foreach (LeaguePosition pos in positions){
-//                             string queue = pos.QueueType == Queue.RANKED_SOLO_5x5 ? "Solo/Duo" :
-//                                             pos.QueueType == Queue.RANKED_FLEX_SR ? "Flex" :
-//                                             pos.QueueType == Queue.RANKED_FLEX_TT ? "Treeline" : (pos.QueueType[0] + pos.QueueType.Substring(1).ToLower());
-//                             tempField.Value += $"{queue}: {pos.Tier[0] + pos.Tier.Substring(1).ToLower()} {pos.Rank}\n";
-//                         }
-//                     }
-//                     catch (InvalidDataException){
-//                         tempField.Value = "Does not exist";
-//                     }
-//                     fieldList.Add(tempField);
-//                 }
-//                 else {
-//                     tempField.Value = "Invalid name";
-//                     fieldList.Add(tempField);
-//                 }
-//             }
-            
-//             toEmbed.ThumbnailUrl = $"http://ddragon.leagueoflegends.com/cdn/{_rapi.patchNum}/img/profileicon/{(topSumm != null ? topSumm.ProfileIconId : 501)}.png"; //Using the topSumm, add a URL to the icon of the player
-//             toEmbed.WithColor(CommandHandlingService.embedColor);
-//             toEmbed.WithCurrentTimestamp();
-//             toEmbed.WithFields(fieldList);
-//             await ReplyAsync(embed:toEmbed.Build());
-//         }
         
 //         [Command("winrate"), Summary("Get a last 20 Ranked games winrate for a player"), Alias("wr"), Remarks("<Player Name>")]
 //         public async Task wr(params string[] names){
